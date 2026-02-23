@@ -2,7 +2,7 @@
 MEM_THRESHOLD = 2**20
 MAX_ITEMS = 50
 
-CACHE_DIRECTORY = "~/.cb_history/"
+CACHE_DIRECTORY = ".cb_history" # in home dir
 POLL_INTERVAL_MS = 500
 
 PREVIEW = {
