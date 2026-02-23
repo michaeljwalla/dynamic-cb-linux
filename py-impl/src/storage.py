@@ -3,7 +3,7 @@ from .models import Representation, CBItem
 
 import sqlite3
 from pathlib import Path
-from collections import deque
+from .deque import deque
 
 _db = None
 
