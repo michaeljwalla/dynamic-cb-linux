@@ -1,6 +1,6 @@
 from .models import CBItem, Representation
 from .deque import deque, deque_node
-from . import config
+from .. import config
 
 class Clipboard:
     __slots__ = ("_hashes", "data")
