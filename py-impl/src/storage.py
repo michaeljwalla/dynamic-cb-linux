@@ -1,9 +1,9 @@
 from . import config
-from classes.models import Representation, CBItem
+from .classes.models import Representation, CBItem
+from .classes.deque import deque
 
 import sqlite3
 from pathlib import Path
-from classes.deque import deque
 
 _db = None
 
