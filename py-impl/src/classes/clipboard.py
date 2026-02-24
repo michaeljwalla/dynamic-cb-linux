@@ -26,7 +26,9 @@ class Clipboard:
     
     def append(self, value: CBItem, _nohash=False) -> tuple[bool, CBItem] | None:
         # False, Value -> exists
-        if value.hash in self._hashes: return False, value                                         
+        if value.hash in self._hashes:
+            self.bringToFront(value)
+            return False, value                                         
 
         lost = None
         # False, None -> too many pinned
