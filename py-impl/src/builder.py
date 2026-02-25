@@ -6,6 +6,8 @@ from hashlib import md5
 from enum import Enum
 
 class BuilderState(Enum):
+    SEND_PRIMARY = -2,
+    READY = -1,
     SUCCESS = 0,
     FAIL_TIMEOUT = 1
 
@@ -13,7 +15,6 @@ class BuilderState(Enum):
 timestamp = None
 active = True
 
-get_targets = api.get_targets
 
 #just check if 
 def check() -> bool: #bool
@@ -23,7 +24,7 @@ def check() -> bool: #bool
     return last != timestamp
 
 
-def _build_snapshot_types(priority:list[str],targets:list[str]) -> Generator[tuple[Representation, bool], None, int]:
+def _build_snapshot_types(priority:list[str],targets:list[str]) -> Generator[tuple[Representation, bool], None, BuilderState]:
     count_p = len(priority)
     #
     dupe = set()
@@ -31,9 +32,9 @@ def _build_snapshot_types(priority:list[str],targets:list[str]) -> Generator[tup
         if target in dupe: continue
         else: dupe.add(target)
         #
-        if check(): return 1 # clipboard changed, stop
+        if check(): return BuilderState.FAIL_TIMEOUT # clipboard changed, stop
         yield api.fetch_data(target), i+1 < count_p # False when all priorities are done
-    return 0
+    return BuilderState.SUCCESS
 
 def _hash(data: bytes)->str:
     return md5(data).hexdigest()
@@ -45,9 +46,10 @@ def builder() -> Generator[any, list[str], any]:
 
     # allow modifying what types to request
     # priority can be used to hash an expected type
-    types = (yield get_targets()) or []
+    types = api.get_targets()
+    types = (yield types) or types
     assert len(types), "At least one datatype is required to snapshot."
-    primary = (yield) or []
+    primary = (yield BuilderState.SEND_PRIMARY) or []
     assert len(primary), "At least one primary type should be specified."
 
     # init
@@ -55,14 +57,18 @@ def builder() -> Generator[any, list[str], any]:
 
     #fetcher's stopiteration states are the same as builders (no purpose of try-catch here)
     fetcher = _build_snapshot_types(primary, types)
-    while True:
-        rep, next_is_primary = next(fetcher)
-        if snapshot.hash == "INVALID_STATE":
-            snapshot.hash = _hash(rep.data)                 # try to initialize snapshot quickly (will work after only fetching 1 type)
-        
-        snapshot.types.append(rep)
-        snapshot.total_size += rep
+    yield BuilderState.READY
+    try:
+        while True:
+            rep, next_is_primary = next(fetcher)
+            if snapshot.hash == "INVALID_STATE":
+                snapshot.hash = _hash(rep.data)                 # try to initialize snapshot quickly (will work after only fetching 1 type)
+            
+            snapshot.types.append(rep)
+            snapshot.total_size += rep.size
 
-        yield snapshot, next_is_primary                     # allow early stopping for any reason
-    #
+            yield snapshot, not next_is_primary                     # allow early stopping for any reason
+        #
+    except StopIteration as state:
+        return state.value
 #
