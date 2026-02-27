@@ -1,9 +1,30 @@
+
+#TODO: __str__ for Representation|mime_type|size|cached|path . and CBItem|id|hash|num_types|total_size
+
+_bytesymbols = [(1, "B"), (int(1e3), "KB"), (int(1e6), "MB"), (int(1e9), "GB")][::-1]
+def _format_bytes(n: int, places: int = 2):
+    val, dec, sym = -1, -1, "?"
+    for value, symbol in _bytesymbols:
+        val, dec, sym = n // value, n % value, symbol
+        if val: break #too small
+    #
+    
+    if (places > 0 and dec): return f"{val}.{str(dec)[:places]} {sym}"
+    return f"{val} {sym}" 
+
 class Representation:
-    __slots__ = ("mime_type", "data", "size")
-    def __init__(self, mime_type, data: bytes, size: int): #bytes
+    __slots__ = ("mime_type", "data", "size", "cached", "path")
+    def __init__(self, mime_type, data: bytes, size: int, cached: bool, path: str): #bytes
         self.mime_type = mime_type
         self.data = data
         self.size = size
+        self.cached = cached
+        self.path = path
+    def __str__(self):
+        return(f"""Representation|{self.mime_type}|\
+{_format_bytes(self.size)}|\
+{self.cached and "Cached" or "Uncached"}|\
+{self.path and self.path or "No path"}""")
 
 class CBItem:
     __slots__ = ("id", "timestamp", "hash", "types", "primary_type", "total_size", "pinned")
@@ -16,3 +37,8 @@ class CBItem:
         self.primary_type = primary_type
         self.total_size = total_size
         self.pinned = pinned
+    
+    def __str__(self):
+        return f"""CBItem|{self.pinned and "Pinned" or "Unpinned"}|\
+{self.id}|{self.timestamp}|{self.hash}|{self.primary_type}|\
+{len(self.types)} types|{_format_bytes(self.total_size)}"""
