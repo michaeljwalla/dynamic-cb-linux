@@ -9,7 +9,9 @@ class BuilderState(Enum):
     SEND_PRIMARY = -2,
     READY = -1,
     SUCCESS = 0,
-    FAIL_TIMEOUT = 1
+    FAIL_TIMEOUT = 1,
+    FAIL_LOADPRIMARY = 2,
+    FAIL_LOADREGULAR = 3
 
 
 timestamp = None
@@ -24,7 +26,7 @@ def check() -> bool: #bool
     return last != timestamp
 
 
-def _build_snapshot_types(priority:list[str],targets:list[str]) -> Generator[tuple[Representation, bool], None, BuilderState]:
+def _build_snapshot_types(priority:list[str],targets:list[str]) -> Generator[tuple[Representation|BuilderState, bool|str], None, BuilderState]:
     count_p = len(priority)
     #
     dupe = set()
@@ -33,7 +35,11 @@ def _build_snapshot_types(priority:list[str],targets:list[str]) -> Generator[tup
         else: dupe.add(target)
         #
         if check(): return BuilderState.FAIL_TIMEOUT # clipboard changed, stop
-        yield api.fetch_data(target), i+1 < count_p # False when all priorities are done
+        rep = api.fetch_data(target)
+        if rep is None:
+            yield (BuilderState.FAIL_LOADPRIMARY if i < count_p else BuilderState.FAIL_LOADREGULAR), target
+        else:
+            yield rep, i+1 < count_p # False when all priorities are done
     return BuilderState.SUCCESS
 
 def _hash(data: bytes)->str:
@@ -41,7 +47,7 @@ def _hash(data: bytes)->str:
 
 # fetches data and hashes
 # id is only used in disk storage
-def builder() -> Generator[any, list[str], any]:
+def builder(assert_all_types=False) -> Generator[any, list[str], any]:
     global timestamp; timestamp = api.get_timestamp()
 
     # allow modifying what types to request
@@ -61,6 +67,11 @@ def builder() -> Generator[any, list[str], any]:
     try:
         while True:
             rep, next_is_primary = next(fetcher)
+            if type(rep) == BuilderState:
+                failtype = next_is_primary
+                assert not assert_all_types, f"Failed to load a {rep == BuilderState.FAIL_LOADREGULAR and "non" or ""}primary type: " + failtype
+                assert rep != BuilderState.FAIL_LOADPRIMARY, f"Failed to load a primary type: " + failtype
+                continue
             if snapshot.hash == "INVALID_STATE":
                 snapshot.hash = _hash(rep.data)                 # try to initialize snapshot quickly (will work after only fetching 1 type)
             
