@@ -1,4 +1,4 @@
-from .models import CBItem, Representation
+from .models import CBItem, Representation, _format_bytes
 from .deque import deque, deque_node
 from .. import config
 
@@ -18,8 +18,12 @@ class Clipboard:
         for node in self.data[1]:
             self._hashes[node.data.hash] = node
     
+    def __contains__(self, item: CBItem | str):
+        return self.getByHash( item.hash if item is CBItem else item ) != None
+    
     def __str__(self):
-        return f"Clipboard: {len(self.data[0])}:{len(self.data[1])}" #Pinned/Unpinned
+        size = sum([i.data.total_size for i in self.data[0]]) + sum([i.data.total_size for i in self.data[1]])
+        return f"Clipboard|{len(self.data[0])}:{len(self.data[1])}|{_format_bytes(size)} Loaded" #Pinned/Unpinned
     
     def __len__(self):
         return len(self.data[0]) + len(self.data[1])
