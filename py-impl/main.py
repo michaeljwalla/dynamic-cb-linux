@@ -63,6 +63,7 @@ def output_blame(blame, left_align=15,right_align=10):
     print()
     for k in blame["TYPES"][1]:
         print(f"{truncate(k,left_align):>{left_align}} | {blame["TYPES"][1][k] / 1e6:>{right_align}.3f} ms")
+    if not len(blame["TYPES"][1]): print("Fast-lookup, value cached.")
     print("-"*(left_align+right_align+6))
     return
 

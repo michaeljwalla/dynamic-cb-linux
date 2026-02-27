@@ -19,7 +19,7 @@ class Clipboard:
             self._hashes[node.data.hash] = node
     
     def __contains__(self, item: CBItem | str):
-        return self.getByHash( item.hash if item is CBItem else item ) != None
+        return self.getByHash( item.hash if type(item) is CBItem else item ) != None
     
     def __str__(self):
         size = sum([i.data.total_size for i in self.data[0]]) + sum([i.data.total_size for i in self.data[1]])
@@ -52,7 +52,7 @@ class Clipboard:
         return
 
     def getByHash(self, hash: str) -> CBItem | None:
-        return hash in self._hashes and self._hashes[hash] or None
+        return hash in self._hashes and self._hashes[hash].data or None
 
     def pop(self, idx: int)-> CBItem | None:
         node = self.data[idx].pop()
