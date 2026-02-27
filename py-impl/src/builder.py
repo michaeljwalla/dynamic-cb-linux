@@ -1,9 +1,12 @@
 from . import x11api as api
 from .classes.models import CBItem, Representation
+from . import config 
 
 from typing import Generator
 from hashlib import md5
 from enum import Enum
+
+
 
 class BuilderState(Enum):
     SEND_PRIMARY = -2,
@@ -26,7 +29,7 @@ def check() -> bool: #bool
     return last != timestamp
 
 
-def _build_snapshot_types(priority:list[str],targets:list[str]) -> Generator[tuple[Representation|BuilderState, bool|str], None, BuilderState]:
+def _build_snapshot_types(priority:list[str],targets:list[str]) -> Generator[tuple[Representation|BuilderState, bool|str, str], None, BuilderState]:
     count_p = len(priority)
     #
     dupe = set()
@@ -35,11 +38,11 @@ def _build_snapshot_types(priority:list[str],targets:list[str]) -> Generator[tup
         else: dupe.add(target)
         #
         if check(): return BuilderState.FAIL_TIMEOUT # clipboard changed, stop
-        rep = api.fetch_data(target)
+        rep = api.fetch_data(target, retries=config.FETCH_RETRY_MAX, delay=config.FETCH_RETRY_DELAY)
         if rep is None:
-            yield (BuilderState.FAIL_LOADPRIMARY if i < count_p else BuilderState.FAIL_LOADREGULAR), target
+            yield (BuilderState.FAIL_LOADPRIMARY if i < count_p else BuilderState.FAIL_LOADREGULAR), target, ""
         else:
-            yield rep, i+1 < count_p # False when all priorities are done
+            yield rep, i+1 < count_p, target # False when all priorities are done
     return BuilderState.SUCCESS
 
 def _hash(data: bytes)->str:
@@ -66,7 +69,7 @@ def builder(assert_all_types=False) -> Generator[any, list[str], any]:
     yield BuilderState.READY
     try:
         while True:
-            rep, next_is_primary = next(fetcher)
+            rep, next_is_primary, added_target = next(fetcher)
             if type(rep) == BuilderState:
                 failtype = next_is_primary
                 assert not assert_all_types, f"Failed to load a {rep == BuilderState.FAIL_LOADREGULAR and "non" or ""}primary type: " + failtype
@@ -78,7 +81,7 @@ def builder(assert_all_types=False) -> Generator[any, list[str], any]:
             snapshot.types.append(rep)
             snapshot.total_size += rep.size
 
-            yield snapshot, not next_is_primary                     # allow early stopping for any reason
+            yield snapshot, not next_is_primary, added_target                     # allow early stopping for any reason
         #
     except StopIteration as state:
         return state.value
