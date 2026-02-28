@@ -5,9 +5,9 @@ from .. import config
 class Clipboard:
     __slots__ = ("_hashes", "data")
     
-    def __init__(self, items:deque[CBItem]=[]):
+    def __init__(self, items:deque[CBItem]=None):
         self.data: list[deque[CBItem]] = [deque(), deque()] # [pinned, unpinned]
-        for n in items:
+        for n in items or []:
             data: CBItem = n.data
             self.append(data, _nohash=True)
         
@@ -68,16 +68,21 @@ class Clipboard:
     def pin(self, value: CBItem):
         node = value.hash in self._hashes and self._hashes[value.hash] or None
         assert node, "Value not in clipboard. (try append?)"
-
-        self.data[0].appendLeft( self.data[1].remove( node ) ) #remove from unpinned and append to front
-        value.pinned = True
+        if value.pinned:
+            self.bringToFront(value)
+        else:
+            self.data[0].appendLeft( self.data[1].remove( node ) ) #remove from unpinned and append to front
+            value.pinned = True
         return
     
     def unpin(self, value: CBItem):
         node = value.hash in self._hashes and self._hashes[value.hash] or None
         assert node, "Value not in clipboard. (try append?)"
 
-        self.data[1].appendLeft( self.data[0].remove( node ) ) #remove from unpinned and append to front
-        value.pinned = False
+        if not value.pinned:
+            self.bringToFront(value)
+        else:
+            self.data[1].appendLeft( self.data[0].remove( node ) ) #remove from unpinned and append to front
+            value.pinned = False
         return
     
