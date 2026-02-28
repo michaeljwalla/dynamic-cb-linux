@@ -29,7 +29,7 @@ def build_snapshot(assert_all_types=False, verifyClipboard=Clipboard(), blame:di
     types = next(builder)        #                              --> available types
     filtered_types = [i for i in types if i in config.MIME_TYPES["SUPPORT"]]
     builder.send(filtered_types)                # send(filtered_types) or ALL  --> BuilderState.SEND_PRIMARY
-    builder.send(types[:1]) # send(primary_types)          --> BuilderState.READY
+    builder.send(filtered_types[0]) # send(primary_types)          --> BuilderState.READY
     blame["INIT"] = tick() - blame["INIT"]
     blame["TYPES"] = [tick(), {}]
     try:
