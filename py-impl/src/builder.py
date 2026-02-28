@@ -58,14 +58,14 @@ def builder(assert_all_types=False) -> Generator[any, list[str], any]:
     types = api.get_targets()
     types = (yield types) or types
     assert len(types), "At least one datatype is required to snapshot."
-    primary = (yield BuilderState.SEND_PRIMARY) or []
-    assert len(primary), "At least one primary type should be specified."
+    primary = (yield BuilderState.SEND_PRIMARY) or ""
+    assert primary in types, "Please enter a primary type (to generate hashes)."
 
     # init
-    snapshot = CBItem(-1, timestamp, "INVALID_STATE", [], primary[0], 0, False)
+    snapshot = CBItem(-1, timestamp, "INVALID_STATE", [], primary, 0, False)
 
     #fetcher's stopiteration states are the same as builders (no purpose of try-catch here)
-    fetcher = _build_snapshot_types(primary, types)
+    fetcher = _build_snapshot_types([primary], types)
     yield BuilderState.READY
     try:
         while True:

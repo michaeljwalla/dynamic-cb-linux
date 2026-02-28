@@ -29,7 +29,7 @@ def build_snapshot(assert_all_types=False, verifyClipboard=Clipboard(), blame:di
     types = next(builder)        #                              --> available types
     filtered_types = [i for i in types if i in config.MIME_TYPES["SUPPORT"]]
     builder.send(filtered_types)                # send(filtered_types) or ALL  --> BuilderState.SEND_PRIMARY
-    builder.send(types[:1]) # send(primary_types)          --> BuilderState.READY
+    builder.send(filtered_types[0]) # send(primary_types)          --> BuilderState.READY
     blame["INIT"] = tick() - blame["INIT"]
     blame["TYPES"] = [tick(), {}]
     try:
@@ -72,13 +72,18 @@ def output_blame(blame, left_align=15,right_align=10):
 while True:
     time.sleep(config.POLL_INTERVAL_MS * 1e-3)
     if not clipwatch.check(): continue
+    #
     print("Found new item...")
     new_item = build_snapshot(True, verifyClipboard=x, blame=blame)
+
+    #
     print("Add", new_item)
     x.append(new_item)
     for i in new_item.types:
         print("\t", i)
     print("new state: ", x)
+
+    #
     print()
     output_blame(blame, 25, 8)
     print()
