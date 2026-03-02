@@ -12,7 +12,7 @@ def _fetch_rep(rep: Representation) -> bytes:
     return rep.data
 
 
-def set_clipboard(item: CBItem):
+def set(item: CBItem):
     global _serve_thread, _serve_stop
 
     if _serve_stop:

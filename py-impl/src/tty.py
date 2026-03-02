@@ -26,13 +26,20 @@ def output_clipboard(c: Clipboard, trunc_len=10) -> str:
         pin_hash,pin_type,pin_size,unpin_hash,unpin_type,unpin_size = "", "", "", "", "", ""
         if i != pinned.tail:
             data: CBItem = i.data
-            pin_hash, pin_type, pin_size = data.hash, data.primary_type, _format_bytes(data.total_size)
+            if data._processing():
+                pin_hash, pin_type, pin_size = "...", "...", "..."
+            else:
+                pin_hash, pin_type, pin_size = data.hash, data.primary_type, _format_bytes(data.total_size)
             i = i.next
         if j != unpinned.tail:
             data: CBItem = j.data
-            unpin_hash, unpin_type, unpin_size = data.hash, data.primary_type, _format_bytes(data.total_size)
+            if data._processing():
+                unpin_hash, unpin_type, unpin_size = "...", "...", "..."
+            else:
+                unpin_hash, unpin_type, unpin_size = data.hash, data.primary_type, _format_bytes(data.total_size)
             j = j.next
         #
+        
         outstr.append( lineformat(ctr, pin_hash, pin_type, pin_size, unpin_hash, unpin_type, unpin_size, trunc_len) )
     #
     outstr.append("-"*len(header))

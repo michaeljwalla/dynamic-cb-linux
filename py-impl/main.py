@@ -5,12 +5,13 @@ import src.config as config
 
 import src.builder as clipwatch
 from src import tty
+from src.processes import watcher, server
 
-import time
 from time import perf_counter_ns as tick
 
 x = Clipboard()
 blame = {}
+watcher.start(x)
 
 #demo how to use clipwatch.builder() generator
 # 1. get types
@@ -84,53 +85,32 @@ def menu_select_general(c:Clipboard, header) -> CBItem|None:
             return None
         selection_choice = tty.get_range(max=len(unpinned), query=f" Select[ {1} - {len(unpinned)} ]") - 1
         choice = unpinned.at(selection_choice)
-    return choice
+    
+    if choice.data._processing():
+        tty.msgwait("This item is still processing.")
+        return None
+    return choice.data
+    
 
 def menu_select(c: Clipboard):
     print()
     choice = menu_select_general(c, "Updating Clipboard Selection:")
-    if choice: c.focus( choice.data )
+    if choice: server.set( choice )
         
 def menu_pinning(c: Clipboard):
     print()
     choice = menu_select_general(c, "Pin/Unpin Items")
-    if choice: c.togglepin( choice.data )
+    if choice: c.togglepin( choice )
 
 menu_options = [menu_select, menu_pinning, None]
 
-cont = ""
 #main loop
 while True:
-
-    #polling for changes
-    if not cont:
-        time.sleep(config.FETCH_POLL_INTERVAL)
-        if not clipwatch.check(): continue
-        #
-        print("Found new item...")
-        new_item = build_snapshot(True, verifyClipboard=x, blame=blame)
-
-        #
-        print("Add", new_item)
-        x.append(new_item)
-        for i in new_item.types:
-            print("\t", i)
-        print("new state: ", x)
-
-        #
-        print()
-        output_blame(blame, 25, 8)
-        print()        
-        cont = input("Type anything to stop polling - ")
-        continue
-
     print("\n" + tty.output_clipboard(x))
-    options = ["Select", "Pin/Unpin", "Cancel (Begin Polling)"]
+    options = ["Select", "Pin/Unpin", "Cancel"]
     action_choice = print() or menu_options[ tty.get_menus(options) - 1 ]
 
-    if not action_choice: #cancel
-        cont = ""
+    if not action_choice:
         continue
-    #
+
     action_choice(x)
-    continue

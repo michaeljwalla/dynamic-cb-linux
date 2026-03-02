@@ -1,13 +1,16 @@
+import threading
 from .models import CBItem, Representation, _format_bytes
 from .deque import deque, deque_node
 from .. import config
 
 class Clipboard:
-    __slots__ = ("_hashes", "data", "max_items")
+    __slots__ = ("_hashes", "data", "max_items", "_ready")
     
     def __init__(self, items:deque[CBItem]=None, max_items=config.MAX_ITEMS):
         self.data: list[deque[CBItem]] = [deque(), deque()] # [pinned, unpinned]
         self.max_items = max_items
+        self._ready = threading.Event()
+        self._ready.set()               # cleared = Processing (item being instantiated), set = Ready
 
         for n in items or []:
             data: CBItem = n.data
@@ -32,7 +35,10 @@ class Clipboard:
     
     def __len__(self):
         return len(self.data[0]) + len(self.data[1])
-    
+
+    def _processing(self) -> bool:
+        return not self._ready.is_set()
+
     def append(self, value: CBItem, _nohash=False) -> tuple[bool, CBItem] | None:
         # False, Value -> exists
         if value.hash in self._hashes:
@@ -96,6 +102,4 @@ class Clipboard:
         else: self.pin(value)
         return
     
-    def focus(self, value: CBItem):
-        pass
     

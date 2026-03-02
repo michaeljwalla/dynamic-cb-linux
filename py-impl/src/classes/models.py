@@ -1,4 +1,6 @@
 
+import threading
+
 #TODO: __str__ for Representation|mime_type|size|cached|path . and CBItem|id|hash|num_types|total_size
 
 _bytesymbols = [(1, "B"), (int(1e3), "KB"), (int(1e6), "MB"), (int(1e9), "GB")][::-1]
@@ -27,7 +29,7 @@ class Representation:
 {self.path and self.path or "No path"}""")
 
 class CBItem:
-    __slots__ = ("id", "timestamp", "hash", "types", "primary_type", "total_size", "pinned")
+    __slots__ = ("id", "timestamp", "hash", "types", "primary_type", "total_size", "pinned", "_ready")
     def __init__(self, id: int, timestamp: float, hash: str, types: list[Representation],
                   primary_type: str, total_size: int, pinned: bool=False):
         self.id = id                        # get from db
@@ -37,7 +39,11 @@ class CBItem:
         self.primary_type = primary_type
         self.total_size = total_size
         self.pinned = pinned
-    
+        self._ready = threading.Event()     # cleared = Processing, set = Ready
+
+    def _processing(self) -> bool:
+        return not self._ready.is_set()
+
     def __str__(self):
         return f"""CBItem|{self.pinned and "Pinned" or "Unpinned"}|\
 {self.id}|{self.timestamp}|{self.hash}|{self.primary_type}|\
