@@ -47,7 +47,7 @@ def _poll_loop(clipboard: Clipboard, stop: threading.Event):
         try:
             builder = clipwatch.builder(assert_all_types=False)
             types = next(builder)
-            filtered = [t for t in types if t in config.MIME_TYPES["SUPPORT"]]
+            filtered = types # [t for t in types if t in config.MIME_TYPES["SUPPORT"]]
 
             if not filtered:
                 continue  # finally will release clipboard._ready

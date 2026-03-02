@@ -9,42 +9,38 @@ PREVIEW = {
     "MAX_IMGAREA": 256**2   # preview media will shrink to be <= dimensional area
 }
 
-WATCHER = {
-    "POLL_RATE": 0.2 #seconds
-}
+# MIME_TYPES = {
+#     "WILL_HASH": set([
+#         'text/plain',
+#         'text/plain;charset=utf-8',
+#         'text/html',
+#         'text/rtf',
+#         'UTF8_STRING',  # common legacy
 
-MIME_TYPES = {
-    "SUPPORT": set([
-        'text/plain',
-        'text/plain;charset=utf-8',
-        'text/html',
-        'text/rtf',
-        'UTF8_STRING',  # common legacy
+#         # image
+#         'image/png',
+#         'image/jpeg',
+#         'image/webp',
+#         'image/tiff',
+#         'image/bmp',
 
-        # image
-        'image/png',
-        'image/jpeg',
-        'image/webp',
-        'image/tiff',
-        'image/bmp',
+#         # files
+#         'text/uri-list',
 
-        # files
-        'text/uri-list',
+#         # office - microsoft
+#         'application/vnd.ms-excel',
+#         'application/vnd.ms-word',
+#         'application/vnd.ms-powerpoint',
 
-        # office - microsoft
-        'application/vnd.ms-excel',
-        'application/vnd.ms-word',
-        'application/vnd.ms-powerpoint',
-
-        # office - open document
-        'application/vnd.oasis.opendocument.text',
-        'application/vnd.oasis.opendocument.spreadsheet',
-        'application/vnd.oasis.opendocument.presentation',
-    ]),
-    "WILL_HASH": { # What it will try to fetch. * means fetch all, anything before will stop early
+#         # office - open document
+#         'application/vnd.oasis.opendocument.text',
+#         'application/vnd.oasis.opendocument.spreadsheet',
+#         'application/vnd.oasis.opendocument.presentation',
+#     ]),
+#     "WILL_HASH": { # What it will try to fetch. * means fetch all, anything before will stop early
         
-    }
-}
+#     }
+# }
 
 WATCH_TIMEOUT = 1.0
 SERVE_POLL_INTERVAL = 1e-3 #ms
