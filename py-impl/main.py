@@ -63,13 +63,47 @@ def output_blame(blame, left_align=15,right_align=10):
     print("-"*(left_align+right_align+6))
     return
 
+def menu_select_general(c:Clipboard, header) -> CBItem|None:
+    options = ["Pinned", "Unpinned", "Cancel"]
+    action_choice = options[ tty.get_menus(options, header=header) - 1 ]
+    if action_choice == "Cancel":
+        tty.msgwait("Canceled")
+        return None
+    pinned, unpinned = c.data
+    choice:CBItem = None
+    if action_choice == "Pinned":
+        if not len(pinned):
+            tty.msgwait("No pinned items.")
+            return None
+        selection_choice = tty.get_range(max=len(pinned), query=f"Select [ {1} - {len(pinned)} ]") - 1
+        choice = pinned.at(selection_choice)
+        #
+    else:
+        if not len(unpinned):
+            tty.msgwait("No unpinned items.")
+            return None
+        selection_choice = tty.get_range(max=len(unpinned), query=f" Select[ {1} - {len(unpinned)} ]") - 1
+        choice = unpinned.at(selection_choice)
+    return choice
 
+def menu_select(c: Clipboard):
+    print()
+    choice = menu_select_general(c, "Updating Clipboard Selection:")
+    if choice: c.focus( choice.data )
+        
+def menu_pinning(c: Clipboard):
+    print()
+    choice = menu_select_general(c, "Pin/Unpin Items")
+    if choice: c.togglepin( choice.data )
+
+menu_options = [menu_select, menu_pinning, None]
 
 cont = ""
 #main loop
 while True:
-    if not cont:
 
+    #polling for changes
+    if not cont:
         time.sleep(config.POLL_INTERVAL_MS * 1e-3)
         if not clipwatch.check(): continue
         #
@@ -87,15 +121,16 @@ while True:
         print()
         output_blame(blame, 25, 8)
         print()        
-        cont = input("quit poll - ")
+        cont = input("Type anything to stop polling - ")
         continue
 
-    print(tty.output_clipboard(x))
-    options = ["Pinned", "Unpinned", "Cancel"]
-    action_choice =  options[ tty.get_menus(options,default=0) - 1 ]
+    print("\n" + tty.output_clipboard(x))
+    options = ["Select", "Pin/Unpin", "Cancel (Begin Polling)"]
+    action_choice = print() or menu_options[ tty.get_menus(options) - 1 ]
 
-    if action_choice == "Pinned":
-        pass #utilize get_range
-    elif action_choice == "Unpinned":
-        pass
+    if not action_choice: #cancel
+        cont = ""
+        continue
+    #
+    action_choice(x)
     continue

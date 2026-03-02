@@ -45,11 +45,10 @@ def tryInt(x:any)->int|None:
     except:
         return None
 
-def get_range(min=1,max=0,query="", invalid="Invalid input.\n", default=None):
-    x = tryInt(input(f"{query} - "))
-    while x is None:
-        print(invalid)
-        x = tryInt( input(f"{query} - ") or default )
+def get_range(min=1,max=0,query="", header="", invalid="Invalid input", default=None):
+    x = tryInt(input(f"{query} - ").strip() or default)
+    while x is None or (x is not default and not (min <= x <= max)):
+        x = tryInt( input(f"{invalid + ("" if query else " ")}{query}- ").strip() or default )
     return x
 
 def get_menus(options=[],header="Select an option:",indent="  ", query="", default=None):
@@ -61,3 +60,7 @@ def get_menus(options=[],header="Select an option:",indent="  ", query="", defau
 
     print("\n".join(outstr))
     return get_range(max=len(options), query=query, default=default)
+
+def msgwait(msg="", wait="Press enter to continue. "):
+    if msg: print(msg)
+    return input(wait)

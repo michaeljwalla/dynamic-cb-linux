@@ -91,6 +91,11 @@ class Clipboard:
             value.pinned = False
         return
     
+    def togglepin(self, value: CBItem):
+        if value.pinned: self.unpin(value)
+        else: self.pin(value)
+        return
+    
     def focus(self, value: CBItem):
         pass
     
