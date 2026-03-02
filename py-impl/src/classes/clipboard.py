@@ -3,10 +3,12 @@ from .deque import deque, deque_node
 from .. import config
 
 class Clipboard:
-    __slots__ = ("_hashes", "data")
+    __slots__ = ("_hashes", "data", "max_items")
     
-    def __init__(self, items:deque[CBItem]=None):
+    def __init__(self, items:deque[CBItem]=None, max_items=config.MAX_ITEMS):
         self.data: list[deque[CBItem]] = [deque(), deque()] # [pinned, unpinned]
+        self.max_items = max_items
+
         for n in items or []:
             data: CBItem = n.data
             self.append(data, _nohash=True)
@@ -14,9 +16,12 @@ class Clipboard:
         # store the node since that wont change, and improve bringToFront to O(1)
         self._hashes: dict[str, deque_node] = dict()
         for node in self.data[0]:
+            if len(self) > max_items: return
             self._hashes[node.data.hash] = node
         for node in self.data[1]:
+            if len(self) > max_items: return
             self._hashes[node.data.hash] = node
+        return
     
     def __contains__(self, item: CBItem | str):
         return self.getByHash( item.hash if type(item) is CBItem else item ) != None
@@ -36,8 +41,8 @@ class Clipboard:
 
         lost = None
         # False, None -> too many pinned
-        if len(self.data[0]) >= config.MAX_ITEMS: return (False, None) 
-        elif len(self) == config.MAX_ITEMS:
+        if len(self.data[0]) >= self.max_items: return (False, None) 
+        elif len(self) == self.max_items:
             lost = self.pop(1)
         #
         self.data[1 - value.pinned].appendLeft(value) # 0 is pinned, 1 is unpinned

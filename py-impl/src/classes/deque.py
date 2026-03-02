@@ -106,8 +106,8 @@ class deque:
         self.tail.prev = self.head
         self.size = 0
     
-    def front(self) -> deque_node | None:
-        return self.size and self.head.next or None
+    def front(self) -> deque_node:
+        return self.size and self.head.next
     
-    def back(self) -> deque_node | None:
-        return self.size and self.tail.prev or None
+    def back(self) -> deque_node:
+        return self.size and self.tail.prev
