@@ -111,3 +111,25 @@ class deque:
     
     def back(self) -> deque_node:
         return self.tail.prev
+    
+    def at(self, idx: int) -> deque_node | None:
+        if idx < 0:
+            idx *= -1
+            cur = self.tail
+            while idx and cur.prev:
+                cur = cur.prev
+                idx -= 1
+            #
+            if not idx and (cur and cur != self.head): return cur # idx = 0, cur != head
+            return None
+        #
+
+        cur = self.head.next
+        while idx and cur.next:
+            cur = cur.next
+            idx -= 1
+        #
+        if not idx and (cur and cur != self.tail): return cur
+        return None
+        
+
