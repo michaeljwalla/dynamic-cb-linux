@@ -1,10 +1,17 @@
 from .classes.clipboard import Clipboard, CBItem, _format_bytes
+from .config import MAX_ITEMS
+from math import log, ceil
+
 def truncate(s: str, n: int) -> str:
     return s if len(s) <= n else s[:n-1] + "…"
 
+#rough solver for birthday problem, determ how much of hash can be truncated at 95% confidence
+# b >= 2 * log2(n) + 3.3
+truncate_hash = min(32, ceil(2 * log(MAX_ITEMS)/log(2) + 3.3) + 1) # +1 for ellipses
+
 lineformat = lambda count,pin_hash,pin_type,pin_size,unpin_hash,unpin_type,unpin_size,trunc_len: f"||{count:^13}||\
-{pin_hash:^32}|{truncate(pin_type, trunc_len):^{trunc_len}}|{pin_size:^9}||{unpin_hash:^32}|\
-{truncate(unpin_type, trunc_len):^{trunc_len}}|{unpin_size:^9}||"
+{truncate(pin_hash, truncate_hash):^{truncate_hash+2}}|{truncate(pin_type, trunc_len):^{trunc_len}}|{pin_size:^12}||\
+{truncate(unpin_hash,truncate_hash):^{truncate_hash+2}}|{truncate(unpin_type, trunc_len):^{trunc_len}}|{unpin_size:^12}||"
 
 def output_clipboard(c: Clipboard, trunc_len=10) -> str:
     header = lineformat("Clipboard", "Pinned", "Type", "Size", "Unpinned", "Type", "Size", trunc_len)
