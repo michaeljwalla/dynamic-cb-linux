@@ -46,6 +46,5 @@ MIME_TYPES = {
         
     }
 }
-    
-FETCH_RETRY_MAX = 5
-FETCH_RETRY_DELAY = 0.1
+
+FETCH_TIMEOUT = 1.0

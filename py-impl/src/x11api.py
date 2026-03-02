@@ -1,6 +1,8 @@
 from .classes.models import Representation
+from . import config
+
 from Xlib import X, display
-import time
+from time import perf_counter as tick
 
 d = display.Display()
 screen = d.screen()
@@ -10,6 +12,15 @@ window = root.create_window(-1,-1,1,1,0, screen.root_depth)
 CLIPBOARD = d.intern_atom('CLIPBOARD')
 TARGETS = d.intern_atom('TARGETS')
 TIMESTAMP = d.intern_atom('TIMESTAMP')
+
+timestamp = None
+
+#just check if 
+def check() -> bool: #bool
+    global timestamp
+    last = timestamp
+    timestamp = get_timestamp()
+    return last != timestamp
 
 def get_timestamp() -> int | None:
     window.convert_selection(CLIPBOARD, TIMESTAMP, TIMESTAMP, X.CurrentTime)
@@ -57,13 +68,14 @@ def _drain_events():
         d.next_event()
 
 
-def _fetch_incr(target_atom) -> bytes:
+def _fetch_incr(target_atom, timeout=config.FETCH_TIMEOUT) -> bytes:
     window.delete_property(target_atom)
     d.flush()
 
     chunks = []
 
-    while True:
+    start = tick()
+    while tick() - start < timeout:
         event = d.next_event()
         if event.type != X.PropertyNotify:
             continue
@@ -71,7 +83,8 @@ def _fetch_incr(target_atom) -> bytes:
             continue
         if event.state != X.PropertyNewValue:
             continue
-
+        
+        start = tick()
         prop = window.get_full_property(target_atom, X.AnyPropertyType)
         if not prop or len(prop.value) == 0:
             window.delete_property(target_atom)
@@ -81,44 +94,45 @@ def _fetch_incr(target_atom) -> bytes:
         chunks.append(bytes(prop.value))
         window.delete_property(target_atom)
         d.flush()
-
+    else:
+        return b""
     return b"".join(chunks)
 
 
-def fetch_data(target_name, retries=5, delay=0.1) -> Representation | None:
+def fetch_data(target_name, timeout=config.FETCH_TIMEOUT) -> Representation | None:
     target_atom = d.intern_atom(target_name)
 
-    for attempt in range(retries):
+    start = tick()
+    #will let multithreading cancel workers
+    while tick() - start < timeout:
         _drain_events()
 
         window.convert_selection(CLIPBOARD, target_atom, target_atom, X.CurrentTime)
         d.flush()
 
+        
         while True:
             event = d.next_event()
             if event.type == X.SelectionNotify:
                 break
 
         if event.property == X.NONE:
-            if attempt < retries - 1:
-                time.sleep(delay)
-                continue
-            return None
+            continue
 
+        #restart timeout window
         prop = window.get_full_property(target_atom, X.AnyPropertyType)
         if not prop:
-            if attempt < retries - 1:
-                time.sleep(delay)
-                continue
-            return None
-
+            continue
+        
+        start = tick()
         if prop.property_type == INCR_ATOM:
-            data = _fetch_incr(target_atom)
+            data = _fetch_incr(target_atom, timeout=timeout)
+            if not data: return None
         else:
             data = bytes(prop.value)
             window.delete_property(target_atom)
             d.flush()
 
         return Representation(target_name, data, len(data), True, "")
-
-    return None
+    else:
+        return None
