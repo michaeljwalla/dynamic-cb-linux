@@ -62,7 +62,9 @@ def builder(assert_all_types=False) -> Generator[any, list[str], any]:
             if type(rep) == BuilderState:
                 failtype = next_is_primary
                 assert not assert_all_types, f"Failed to load a {rep == BuilderState.FAIL_LOADREGULAR and "non" or ""}primary type: " + failtype
-                assert rep != BuilderState.FAIL_LOADPRIMARY, f"Failed to load a primary type: " + failtype
+                #assert rep != BuilderState.FAIL_LOADPRIMARY, f"Failed to load a primary type: " + failtype
+                if rep == BuilderState.FAIL_LOADPRIMARY:
+                    yield rep, failtype, None #cancel node creation
                 continue
             if snapshot.hash == "INVALID_STATE":
                 snapshot.hash = _hash(rep.data)                 # try to initialize snapshot quickly (will work after only fetching 1 type)

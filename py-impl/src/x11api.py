@@ -2,7 +2,7 @@ from .classes.models import Representation
 from . import config
 
 from Xlib import X, display
-from time import perf_counter as tick
+from time import perf_counter as tick, sleep
 
 d = display.Display()
 screen = d.screen()
@@ -68,7 +68,7 @@ def _drain_events():
         d.next_event()
 
 
-def _fetch_incr(target_atom, timeout=config.FETCH_TIMEOUT) -> bytes:
+def _fetch_incr(target_atom, timeout=config.WATCH_TIMEOUT) -> bytes:
     window.delete_property(target_atom)
     d.flush()
 
@@ -76,6 +76,10 @@ def _fetch_incr(target_atom, timeout=config.FETCH_TIMEOUT) -> bytes:
 
     start = tick()
     while tick() - start < timeout:
+        if not d.pending_events():
+            sleep(config.WATCH_POLL_RETRY_INTERVAL)
+            continue
+
         event = d.next_event()
         if event.type != X.PropertyNotify:
             continue
@@ -99,7 +103,7 @@ def _fetch_incr(target_atom, timeout=config.FETCH_TIMEOUT) -> bytes:
     return b"".join(chunks)
 
 
-def fetch_data(target_name, timeout=config.FETCH_TIMEOUT) -> Representation | None:
+def fetch_data(target_name, timeout=config.WATCH_TIMEOUT) -> Representation | None:
     target_atom = d.intern_atom(target_name)
 
     start = tick()
@@ -110,11 +114,16 @@ def fetch_data(target_name, timeout=config.FETCH_TIMEOUT) -> Representation | No
         window.convert_selection(CLIPBOARD, target_atom, target_atom, X.CurrentTime)
         d.flush()
 
-        
-        while True:
-            event = d.next_event()
-            if event.type == X.SelectionNotify:
-                break
+        deadline = tick() + timeout
+        while tick() < deadline:
+            if d.pending_events():
+                event = d.next_event()
+                if event.type == X.SelectionNotify:
+                    break
+            else:
+                sleep(config.WATCH_POLL_RETRY_INTERVAL)
+        else:
+            return None  # owner never responded within timeout
 
         if event.property == X.NONE:
             continue
