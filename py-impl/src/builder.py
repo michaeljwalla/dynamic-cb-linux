@@ -17,18 +17,7 @@ class BuilderState(Enum):
     FAIL_LOADREGULAR = 3
 
 
-timestamp = None
-active = True
-
-
-#just check if 
-def check() -> bool: #bool
-    global timestamp
-    last = timestamp
-    timestamp = api.get_timestamp()
-    return last != timestamp
-
-
+check = api.check
 def _build_snapshot_types(priority:list[str],targets:list[str]) -> Generator[tuple[Representation|BuilderState, bool|str, str], None, BuilderState]:
     count_p = len(priority)
     #
@@ -37,8 +26,8 @@ def _build_snapshot_types(priority:list[str],targets:list[str]) -> Generator[tup
         if target in dupe: continue
         else: dupe.add(target)
         #
-        if check(): return BuilderState.FAIL_TIMEOUT # clipboard changed, stop
-        rep = api.fetch_data(target, retries=config.FETCH_RETRY_MAX, delay=config.FETCH_RETRY_DELAY)
+        if api.check(): return BuilderState.FAIL_TIMEOUT # clipboard changed, stop
+        rep = api.fetch_data(target)
         if rep is None:
             yield (BuilderState.FAIL_LOADPRIMARY if i < count_p else BuilderState.FAIL_LOADREGULAR), target, ""
         else:
