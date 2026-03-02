@@ -1,7 +1,7 @@
 import threading
 from Xlib import X, display as xdisplay
-from .classes.models import CBItem, Representation
-from . import config
+from ..classes.models import CBItem, Representation
+from .. import config
 
 _serve_thread: threading.Thread | None = None
 _serve_stop:   threading.Event  | None = None
