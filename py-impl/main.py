@@ -104,7 +104,7 @@ while True:
 
     #polling for changes
     if not cont:
-        time.sleep(config.POLL_INTERVAL_MS * 1e-3)
+        time.sleep(config.FETCH_POLL_INTERVAL)
         if not clipwatch.check(): continue
         #
         print("Found new item...")

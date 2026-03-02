@@ -3,7 +3,6 @@ MEM_THRESHOLD = 2**20
 MAX_ITEMS = 50
 
 CACHE_DIRECTORY = ".cb_history" # in home dir
-POLL_INTERVAL_MS = 500
 
 PREVIEW = {
     "MAX_STRLEN": 25,       # truncate (...) after 25 chars
@@ -48,3 +47,5 @@ MIME_TYPES = {
 }
 
 FETCH_TIMEOUT = 1.0
+SERVE_POLL_INTERVAL = 100e-3 #ms
+FETCH_POLL_INTERVAL = 500e-3

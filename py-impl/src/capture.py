@@ -1,7 +1,7 @@
 import threading
 from Xlib import X, display as xdisplay
 from .classes.models import CBItem, Representation
-
+from . import config
 
 _serve_thread: threading.Thread | None = None
 _serve_stop:   threading.Event  | None = None
@@ -33,24 +33,42 @@ def _serve_loop(item: CBItem, stop: threading.Event):
 
     CLIPBOARD = d.intern_atom('CLIPBOARD')
     TARGETS   = d.intern_atom('TARGETS')
+    INCR      = d.intern_atom('INCR')
 
     # advertisements: every mime type the item can serve
     ads: dict[int, Representation] = {
         d.intern_atom(rep.mime_type): rep for rep in item.types
     }
 
+    # Active INCR transfers: (requestor_window_id, property_atom) → (window, target_atom, data, offset)
+    incr: dict[tuple[int, int], tuple] = {}
+    CHUNK = 65536
+
     w.set_selection_owner(CLIPBOARD, X.CurrentTime)
     d.flush()
 
     while not stop.is_set():
         if not d.pending_events():
-            stop.wait(0.005)
+            stop.wait(config.SERVE_POLL_INTERVAL)
             continue
 
         event = d.next_event()
 
         if event.type == X.SelectionClear:
             break  # another app took ownership
+
+        if event.type == X.PropertyNotify:
+            key = (event.window.id, event.atom)
+            if event.state == X.PropertyDelete and key in incr:
+                win, target_atom, data, offset = incr[key]
+                chunk = data[offset:offset + CHUNK]
+                win.change_property(event.atom, target_atom, 8, chunk)
+                d.flush()
+                if chunk:
+                    incr[key] = (win, target_atom, data, offset + len(chunk))
+                else:
+                    del incr[key]
+            continue
 
         if event.type != X.SelectionRequest:
             continue
@@ -61,7 +79,14 @@ def _serve_loop(item: CBItem, stop: threading.Event):
         if target == TARGETS:
             _respond(d, req, TARGETS, list(ads.keys()), fmt=32)
         elif target in ads:
-            _respond(d, req, target, _fetch_rep(ads[target]), fmt=8)
+            data = _fetch_rep(ads[target])
+            if len(data) > CHUNK:
+                req.requestor.change_attributes(event_mask=X.PropertyChangeMask)
+                req.requestor.change_property(req.property, INCR, 32, [len(data)])
+                _notify(d, req, req.property)
+                incr[(req.requestor.id, req.property)] = (req.requestor, target, data, 0)
+            else:
+                _respond(d, req, target, data, fmt=8)
         else:
             _refuse(d, req)
 
