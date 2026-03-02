@@ -31,7 +31,7 @@ def stop():
 
 def _poll_loop(clipboard: Clipboard, stop: threading.Event):
     while not stop.is_set():
-        stop.wait(config.WATCHER["POLL_RATE"])
+        stop.wait(config.WATCH_POLL_INTERVAL)
         if stop.is_set():
             break
 
@@ -54,11 +54,13 @@ def _poll_loop(clipboard: Clipboard, stop: threading.Event):
 
             builder.send(filtered)
             builder.send(filtered[0])
-
+            print("BUILDING CBItem of datatype", filtered[0])
             try:
                 while not stop.is_set():
                     snapshot, *_ = next(builder)
-
+                    if snapshot == clipwatch.BuilderState.FAIL_LOADPRIMARY:
+                        print("FAILED to load CBItem of datatype", _[0])
+                        break #do not add
                     if not appended and snapshot.hash != "INVALID_STATE":
                         # Deduplicate: reuse existing item if hash is already known
                         if snapshot in clipboard:
@@ -81,7 +83,7 @@ def _poll_loop(clipboard: Clipboard, stop: threading.Event):
             # Idempotent: ensures clipboard is never left locked on any exit path
             # (empty filtered list, stop signal mid-fetch, unexpected exception, etc.)
             clipboard._ready.set()
-
+            print("COMPLETE")
             # Mark item ready only if we own it (not a duplicate reuse)
             if appended and snapshot is not None:
                 snapshot._ready.set()
