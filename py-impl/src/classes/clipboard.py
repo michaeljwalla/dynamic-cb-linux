@@ -91,3 +91,6 @@ class Clipboard:
             value.pinned = False
         return
     
+    def focus(self, value: CBItem):
+        pass
+    
