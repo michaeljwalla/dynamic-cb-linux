@@ -56,7 +56,7 @@ menu_options = [menu_select, menu_pinning, None]
 #main loop
 while True:
     print("\n" + tty.output_clipboard(x))
-    options = ["Select", "Pin/Unpin", "Cancel"]
+    options = ["Select", "Pin/Unpin", "Reload"]
     action_choice = print() or menu_options[ tty.get_menus(options) - 1 ]
 
     if not action_choice:

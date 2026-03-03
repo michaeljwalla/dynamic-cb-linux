@@ -6,6 +6,7 @@ from typing import Generator
 from hashlib import md5
 from enum import Enum
 
+from time import perf_counter_ns as tick
 
 
 class BuilderState(Enum):
@@ -26,7 +27,11 @@ def _build_snapshot_types(priority:list[str],targets:list[str]) -> Generator[tup
         if target in dupe: continue
         else: dupe.add(target)
         #
-        if api.check(): return BuilderState.FAIL_TIMEOUT # clipboard changed, stop
+        if api.check():
+            if config.DEBUG: print("CLIPBOARD CHANGE")
+            return BuilderState.FAIL_TIMEOUT # clipboard changed, stop
+        
+        diff = tick()
         rep = api.fetch_data(target)
         if rep is None:
             yield (BuilderState.FAIL_LOADPRIMARY if i < count_p else BuilderState.FAIL_LOADREGULAR), target, ""
@@ -39,11 +44,13 @@ def _hash(data: bytes)->str:
 
 # fetches data and hashes
 # id is only used in disk storage
+blame = {}
 def builder(assert_all_types=False) -> Generator[any, list[str], any]:
     global timestamp; timestamp = api.get_timestamp()
 
     # allow modifying what types to request
     # priority can be used to hash an expected type
+    blame["INIT"] = tick()
     types = api.get_targets()
     types = (yield types) or types
     assert len(types), "At least one datatype is required to snapshot."
@@ -56,14 +63,18 @@ def builder(assert_all_types=False) -> Generator[any, list[str], any]:
     #fetcher's stopiteration states are the same as builders (no purpose of try-catch here)
     fetcher = _build_snapshot_types([primary], types)
     yield BuilderState.READY
+    blame["INIT"] = tick() - blame["INIT"]
+    blame["TYPES"] = {}
     try:
         while True:
+            diff = tick()
             rep, next_is_primary, added_target = next(fetcher)
             if type(rep) == BuilderState:
                 failtype = next_is_primary
                 assert not assert_all_types, f"Failed to load a {rep == BuilderState.FAIL_LOADREGULAR and "non" or ""}primary type: " + failtype
                 #assert rep != BuilderState.FAIL_LOADPRIMARY, f"Failed to load a primary type: " + failtype
                 if rep == BuilderState.FAIL_LOADPRIMARY:
+                    blame["TYPES"][added_target] = tick() - diff
                     yield rep, failtype, None #cancel node creation
                 continue
             if snapshot.hash == "INVALID_STATE":
@@ -72,6 +83,7 @@ def builder(assert_all_types=False) -> Generator[any, list[str], any]:
             snapshot.types.append(rep)
             snapshot.total_size += rep.size
 
+            blame["TYPES"][added_target] = tick() - diff
             yield snapshot, not next_is_primary, added_target                     # allow early stopping for any reason
         #
     except StopIteration as state:

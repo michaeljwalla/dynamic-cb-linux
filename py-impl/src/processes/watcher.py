@@ -8,6 +8,7 @@ from src.classes.clipboard import Clipboard
 _watcher_thread: threading.Thread | None = None
 _watcher_stop:   threading.Event  | None = None
 
+from time import perf_counter_ns as tick
 
 def start(clipboard: Clipboard):
     global _watcher_thread, _watcher_stop
@@ -54,9 +55,11 @@ def _poll_loop(clipboard: Clipboard, stop: threading.Event):
 
             builder.send(filtered)
             builder.send(filtered[0])
-            print("BUILDING CBItem of datatype", filtered[0])
+            if config.DEBUG: print("BUILDING CBItem of datatype", filtered[0])
             try:
+                x = tick()
                 while not stop.is_set():
+                    y = tick()
                     snapshot, *_ = next(builder)
                     if snapshot == clipwatch.BuilderState.FAIL_LOADPRIMARY:
                         print("FAILED to load CBItem of datatype", _[0])
@@ -78,12 +81,20 @@ def _poll_loop(clipboard: Clipboard, stop: threading.Event):
 
             except StopIteration:
                 pass  # BuilderState; data is whatever was accumulated
-
         finally:
             # Idempotent: ensures clipboard is never left locked on any exit path
             # (empty filtered list, stop signal mid-fetch, unexpected exception, etc.)
             clipboard._ready.set()
-            print("COMPLETE")
+            if config.DEBUG:
+                print("COMPLETE")
+                print()
+                total = clipwatch.blame["INIT"]
+                print("INIT", f"{clipwatch.blame["INIT"] * 1e-6:.2f}")
+                for k in clipwatch.blame["TYPES"]:
+                    print(f"{k:>25}", f"{clipwatch.blame["TYPES"][k] * 1e-6:.2f}")
+                    total += clipwatch.blame["TYPES"][k]
+                print("TOTAL", f"{(total)*1e-6:.3f}")
+                print()
             # Mark item ready only if we own it (not a duplicate reuse)
             if appended and snapshot is not None:
                 snapshot._ready.set()

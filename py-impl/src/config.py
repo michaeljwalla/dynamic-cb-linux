@@ -1,3 +1,6 @@
+DEBUG = False
+
+
 # 1MB, max size each item may be before removing from cache
 MEM_THRESHOLD = 2**20
 MAX_ITEMS = 50
@@ -45,4 +48,4 @@ PREVIEW = {
 WATCH_TIMEOUT = 1.0
 SERVE_POLL_INTERVAL = 1e-3 #ms
 WATCH_POLL_INTERVAL = 200e-3
-WATCH_POLL_RETRY_INTERVAL = 10e-3
+WATCH_POLL_RETRY_INTERVAL = 0e-3

@@ -104,6 +104,7 @@ def _fetch_incr(target_atom, timeout=config.WATCH_TIMEOUT) -> bytes:
 
 
 def fetch_data(target_name, timeout=config.WATCH_TIMEOUT) -> Representation | None:
+    if config.DEBUG: print("START", target_name)
     target_atom = d.intern_atom(target_name)
 
     start = tick()
@@ -122,17 +123,21 @@ def fetch_data(target_name, timeout=config.WATCH_TIMEOUT) -> Representation | No
                     break
             else:
                 sleep(config.WATCH_POLL_RETRY_INTERVAL)
+                pass
         else:
             return None  # owner never responded within timeout
 
         if event.property == X.NONE:
-            continue
+            continue  # Clipboard doesn't support this type
 
         #restart timeout window
         prop = window.get_full_property(target_atom, X.AnyPropertyType)
         if not prop:
-            continue
+            # continue
+            if config.DEBUG: print("Fail prop")
+            return None
         
+        if config.DEBUG: print("GOT PROP")
         start = tick()
         if prop.property_type == INCR_ATOM:
             data = _fetch_incr(target_atom, timeout=timeout)
