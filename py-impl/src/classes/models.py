@@ -4,14 +4,14 @@ import threading
 #TODO: __str__ for Representation|mime_type|size|cached|path . and CBItem|id|hash|num_types|total_size
 
 _bytesymbols = [(1, "B"), (int(1e3), "KB"), (int(1e6), "MB"), (int(1e9), "GB")][::-1]
-def _format_bytes(n: int, places: int = 2):
+def _format_bytes(n: int, places: int = 2, symbols=True):
     val, dec, sym = -1, -1, "?"
     for value, symbol in _bytesymbols:
         val, dec, sym = n // value, n % value, symbol
         if val: break #too small
     #
     
-    if (places > 0 and dec): return f"{val}.{str(dec)[:places]} {sym}"
+    if (places > 0 and dec): return f"{val}.{str(dec)[:places]}{" "+sym if symbols else ""}"
     return f"{val} {sym}" 
 
 class Representation:
@@ -44,6 +44,9 @@ class CBItem:
     def _processing(self) -> bool:
         return not self._ready.is_set()
 
+    def get_cached_size(self) -> bool:
+        return sum([i.size for i in self.types if i.cached])
+    
     def __str__(self):
         return f"""CBItem|{self.pinned and "Pinned" or "Unpinned"}|\
 {self.id}|{self.timestamp}|{self.hash}|{self.primary_type}|\

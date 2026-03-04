@@ -4,10 +4,11 @@ from .deque import deque, deque_node
 from .. import config
 
 class Clipboard:
-    __slots__ = ("_hashes", "data", "max_items", "_ready")
+    __slots__ = ("_hashes", "data", "max_items", "_ready", "selection")
     
     def __init__(self, items:deque[CBItem]=None, max_items=config.MAX_ITEMS):
         self.data: list[deque[CBItem]] = [deque(), deque()] # [pinned, unpinned]
+        self.selection = None
         self.max_items = max_items
         self._ready = threading.Event()
         self._ready.set()               # cleared = Processing (item being instantiated), set = Ready
@@ -101,5 +102,10 @@ class Clipboard:
         if value.pinned: self.unpin(value)
         else: self.pin(value)
         return
+    
+    def focus(self, value: CBItem):
+        if value not in self: return False
+        self.selection = value
+        return True
     
     
