@@ -81,7 +81,7 @@ def _serve_loop(item: CBItem, stop: threading.Event):
             if target == TARGETS:
                 _respond(d, req, TARGETS, list(ads.keys()), fmt=32)
             elif target in ads:
-                if config.debug: print("SERVE", target)
+                if config.DEBUG: print("SERVE", target)
                 data = _fetch_rep(ads[target])
                 if len(data) > CHUNK:
                     req.requestor.change_attributes(event_mask=X.PropertyChangeMask)
