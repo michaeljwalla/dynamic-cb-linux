@@ -1,9 +1,13 @@
 import threading
+from pathlib import Path
+import re
 
-import src.builder as clipwatch
 from src import config
-from src.classes.models import CBItem
+from src.classes.models import CBItem, Representation
 from src.classes.clipboard import Clipboard
+
+rwpath: Path = Path.home() / config.CACHE_DIRECTORY / "blobs"
+rwpath.mkdir(parents=True, exist_ok=True)
 
 _watcher_thread: threading.Thread | None = None
 _watcher_stop:   threading.Event  | None = None
@@ -29,6 +33,147 @@ def stop():
     if _watcher_stop:
         _watcher_stop.set()
 
+
+def sanitize(mime_type: str) -> str:
+    if not mime_type or not isinstance(mime_type, str):
+        return "SANITIZE_FAIL"
+
+    sanitized = mime_type.strip()
+    sanitized = sanitized.replace("/", "_")
+    sanitized = re.sub(r"[;=]", "_", sanitized)
+    sanitized = re.sub(r"\s+", "_", sanitized)
+    sanitized = re.sub(r"[^\w.\-]", "", sanitized)
+    sanitized = re.sub(r"[_.\-]{2,}", "_", sanitized)
+    sanitized = sanitized.strip("_.-")
+
+    return sanitized or "SANITIZE_EMPTY"
+
+def offload(item: CBItem, types:list[str]=None, overwrite=False) -> dict[str, bool]:
+    if item._processing(): return {}                                    # not ready
+    if types is None: types = [i.mime_type for i in item.types]       # default all
+    #
+    item._ready.clear()
+    #
+    dir = rwpath / item.hash
+    dir.mkdir(exist_ok=True)
+
+    success = dict(zip(types, [False] * len(types)))
+    attempt_writes: list[Representation] = []
+    for r in item.types:
+        if (r.mime_type not in success): continue
+        attempt_writes.append(r)
+    
+    for r in attempt_writes:
+        file: Path = dir / (sanitize(r.mime_type) + ".bin")
+        fail = False
+        #
+        if not file.exists() or overwrite: #file DNE; file DE but overwrite
+            try:
+                file.write_bytes(r.data)
+            except Exception as e:
+                print("WRITE ERR", file, e)
+                fail = True
+        if fail:
+            continue
+        #
+        r.data = None
+        r.cached = False
+        r.path = str(file)
+        success[r.mime_type] = True
+    
+    item._ready.set()
+    return success
+
+
+def load(item: CBItem, types:list[str]=None) -> dict[str, bool]:
+    if item._processing(): return {}                                    # not ready
+    if types is None: types = [i.mime_type for i in item.types]
+    item._ready.clear()
+#
+    dir = rwpath / item.hash
+
+    success = dict(zip(types, [False] * len(types)))
+    if not dir.exists():
+        item._ready.set()
+        return success
+    dir.mkdir(exist_ok=True)
+
+    attempt_reads: list[Representation] = []
+    for r in item.types:
+        if (r.mime_type not in success): continue
+        attempt_reads.append(r)
+    
+    for r in attempt_reads:
+        file: Path = dir / (sanitize(r.mime_type) + ".bin")
+        fail = False
+        #
+        if not file.exists():
+            success[r.mime_type] = r.cached #was already loaded
+            continue
+
+        try:
+            r.data = file.read_bytes()
+        except Exception as e:
+            print("READ ERR", file, e)
+            fail = True
+        if fail:
+            continue
+        #
+        r.cached = True
+        r.path = str(file)
+        success[r.mime_type] = True
+    
+    item._ready.set()
+    return success
+
+#remove from fs and (opt) load back into memory
+def clear(item: CBItem, load=False) -> bool:
+    if (item._processing()): return False
+    if load: load(item)
+    item._ready.clear()
+
+    dir:Path = rwpath / item.hash
+    if not dir.exists():
+        item._ready.set()
+        return True
+    toRemove:list[Path] = []
+    for f in dir.iterdir():
+        if not ((f.name[-4:].lower() == ".bin") and f.is_file()):
+            item._ready.set()
+            return False #a foreign object exists
+        toRemove.append(f)
+    #
+    for i in toRemove: i.unlink(missing_ok=True)
+    dir.rmdir()
+
+    item._ready.set()
+    return True
+
+#trust that hash is not present in clipboard
+def _clear_by_hash(hash: str)->bool:
+    dir:Path = rwpath / hash
+    if not dir.exists(): return True
+
+    toRemove:list[Path] = []
+    for f in dir.iterdir():
+        if not ((f.name[-4:].lower() == ".bin") and f.is_file()):
+            return False #a foreign object exists
+        toRemove.append(f)
+    #
+    for i in toRemove: i.unlink(missing_ok=True)
+    dir.rmdir()
+
+    return True
+
+#remove remnant files
+def cleanup_remnants(c: Clipboard, clear_unpinned=False):
+    for dir in rwpath.iterdir():
+        if dir.is_symlink() or not dir.is_dir(): continue
+        dir:Path = dir #type annot bugged
+        item = c.getByHash(dir.name)
+        if (item and (item.pinned or (not clear_unpinned))): continue #item exists; item is unpinned BUT we arent clearing those
+        _clear_by_hash(dir.name)
+    return
 def _poll_loop(clipboard: Clipboard, stop: threading.Event):
     while not stop.is_set():
         stop.wait(config.OFFLOAD_POLL_INTERVAL)
