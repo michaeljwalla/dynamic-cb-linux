@@ -1,8 +1,8 @@
 DEBUG = False
 
 
-# 1MB, max size each item may be before removing from cache
-MEM_THRESHOLD = 2**20
+MEM_THRESHOLD_MB = 300
+MEM_DUMP_THRESHOLD_MB = 150
 MAX_ITEMS = 50
 
 CACHE_DIRECTORY = ".cb_history" # in home dir

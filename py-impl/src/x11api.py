@@ -147,6 +147,6 @@ def fetch_data(target_name, timeout=config.WATCH_TIMEOUT) -> Representation | No
             window.delete_property(target_atom)
             d.flush()
 
-        return Representation(target_name, data, len(data), True, "")
+        return Representation(target_name, data, len(data), False, "")
     else:
         return None

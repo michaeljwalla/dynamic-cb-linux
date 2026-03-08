@@ -11,7 +11,7 @@ def generate(item: CBItem) -> tuple[str, bool]:
         if not rep.cached and rep.path:
             try:
                 rep.data = Path(rep.path).read_bytes()
-                rep.cached = True
+                #rep.cached = True
             except Exception as e:
                 print(f"Error loading {rep.path}: {e}")
                 continue

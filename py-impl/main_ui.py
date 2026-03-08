@@ -3,15 +3,20 @@ import tkinter as tk
 from PIL import Image, ImageTk
 import src.preview as preview
 from src.classes.clipboard import Clipboard
+from src.classes.models import _format_bytes
 import src.processes.watcher as watcher
 import src.processes.server as server
+from src import config
 
 ASSETS_DIR = os.path.join(os.path.dirname(__file__), "ui")
 
 COLOR_BG     = "#1e2d3e"   # widget background (darkest)
 COLOR_ITEM   = "#2f4a6a"   # item base color
 COLOR_ACCENT = "#4a7ab5"   # accent / highlight border (lighter)
+COLOR_PIN    = "#b57a4a"   # warm amber — pinned item border highlight
+COLOR_SELECT = "#7ab54a"   # green accent — selected item border highlight (highest priority)
 COLOR_HOVER  = "#3d6a9b"   # item hover color
+COLOR_STATUS = "#253545"   # status bar background (slightly lighter than bg)
 
 BUTTON_SIZE    = 11   # reduced by ~75%
 BUTTON_PAD_R   = 3    # gap from right edge of frame (halved)
@@ -36,6 +41,7 @@ def alerting(cbitem):
         if cbitem._ready.is_set():
             ui_clipboard.add(cbitem, item_dict[hash])
     ui_clipboard._update_no_history()
+    ui_clipboard._update_status()
 
 
 def _load_icon(filename: str, size: int, opacity: float = 1.0) -> ImageTk.PhotoImage:
@@ -96,6 +102,7 @@ class UI_OptionsMenu(tk.Toplevel):
         # Remove from clipboard
         clipboard.remove(self.cbitem)
         self.item._cb._update_no_history()
+        self.item._cb._update_status()
         self.destroy()
 
 
@@ -169,9 +176,10 @@ class UI_ClipboardItem(tk.Frame):
     _bg_hover  = COLOR_HOVER
     _bg_accent = COLOR_ACCENT
 
-    def __init__(self, cb: "UI_ClipboardWidget", cbitem=None):
+    def __init__(self, cb: "UI_ClipboardWidget", cbitem=None, parent=None):
+        actual_parent = parent if parent is not None else cb
         super().__init__(
-            cb,
+            actual_parent,
             bg=self._bg,
             height=self._height,
             highlightthickness=1,
@@ -199,9 +207,28 @@ class UI_ClipboardItem(tk.Frame):
         self.pin.bind("<Button-1>", lambda _e: self._on_pin_click())
         self.options.bind("<Button-1>", lambda _e: self._on_options_click())
 
+        # Bind mousewheel events to delegate scroll to clipboard widget
+        self.bind("<Button-4>",   lambda _e: self._cb._on_mousewheel(_e))
+        self.bind("<Button-5>",   lambda _e: self._cb._on_mousewheel(_e))
+        self.bind("<MouseWheel>", lambda _e: self._cb._on_mousewheel(_e))
+
         # Set initial loading preview
         if cbitem:
             self.set_preview("( ... processing ... )" , is_path=False)
+
+    def _update_pin_accent(self):
+        color = COLOR_PIN if self._pinned else COLOR_ACCENT
+        self.configure(highlightbackground=color)
+
+    def _update_accent(self):
+        """Update accent color with priority: selected > pinned > normal."""
+        if self._cb.selected_item == self:
+            color = COLOR_SELECT
+        elif self._pinned:
+            color = COLOR_PIN
+        else:
+            color = COLOR_ACCENT
+        self.configure(highlightbackground=color)
 
     def _hover(self, active: bool):
         color = self._bg_hover if active else self._bg
@@ -217,12 +244,14 @@ class UI_ClipboardItem(tk.Frame):
             # Unpin: move to bottom of unpinned section
             self._pinned = False
             self.pin.set_opacity(0.25)
+            self._update_accent()
             self._cb.items.remove(self)
             self._cb.items.append(self)
         else:
             # Pin: move to bottom of pinned section (top if no other pinned items)
             self._pinned = True
             self.pin.set_opacity(1.0)
+            self._update_accent()
             self._cb.items.remove(self)
             # Find first unpinned item and insert before it
             insert_idx = len(self._cb.items)
@@ -232,6 +261,7 @@ class UI_ClipboardItem(tk.Frame):
                     break
             self._cb.items.insert(insert_idx, self)
         self._cb._repack_items()
+        self._cb._update_status()
         self.on_pin_clicked()
 
     def _on_click(self):
@@ -241,6 +271,8 @@ class UI_ClipboardItem(tk.Frame):
             if cbitem:
                 clipboard.focus(cbitem)
                 server.set(cbitem)
+                # Update UI selection
+                self._cb._set_selection(self)
             else:
                 # Reset or ignore
                 pass
@@ -314,21 +346,111 @@ class UI_ClipboardWidget(tk.Frame):
     def __init__(self, root: tk.Tk, w: int = int(240*1.5), h: int = int(300*1.5)):
         super().__init__(root, bg=COLOR_BG, width=w, height=h)
         self.items: list[UI_ClipboardItem] = []
+        self.selected_item: UI_ClipboardItem | None = None  # Track currently selected item
         self.pack_propagate(False)
         self.pack()
-        # No history label
-        self.no_history_label = tk.Label(
+
+        # Header frame (non-scrollable)
+        self.header_frame = tk.Frame(self, bg=COLOR_BG, height=0)
+        self.header_frame.pack(side=tk.TOP, fill=tk.X)
+        self.header_frame.pack_propagate(True)
+
+        # Status frame at bottom
+        self.status_frame = tk.Frame(self, bg=COLOR_STATUS, height=20)
+        self.status_frame.pack(side=tk.BOTTOM, fill=tk.X)
+        self.status_frame.pack_propagate(False)
+
+        self.status_left = tk.Label(
+            self.status_frame,
+            text="",
+            bg=COLOR_STATUS,
+            fg="white",
+            font=("Helvetica", 8),
+            anchor="w"
+        )
+        self.status_left.pack(side=tk.LEFT, padx=5)
+
+        self.status_right = tk.Label(
+            self.status_frame,
+            text="",
+            bg=COLOR_STATUS,
+            fg="white",
+            font=("Helvetica", 8),
+            anchor="e"
+        )
+        self.status_right.pack(side=tk.RIGHT, padx=5)
+
+        # Scrollbar
+        self._scrollbar = tk.Scrollbar(self, orient=tk.VERTICAL)
+        self._scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+
+        # Canvas for scrolling
+        self._canvas = tk.Canvas(
             self,
+            bg=COLOR_BG,
+            highlightthickness=0,
+            yscrollcommand=self._scrollbar.set
+        )
+        self._canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        self._scrollbar.configure(command=self._canvas.yview)
+
+        # Frame inside canvas to hold items
+        self._scroll_frame = tk.Frame(self._canvas, bg=COLOR_BG)
+        self._canvas_window = self._canvas.create_window((0, 0), window=self._scroll_frame, anchor="nw")
+
+        # Bind canvas configure to update scroll region
+        self._canvas.bind("<Configure>", self._on_canvas_configure)
+        self._scroll_frame.bind("<Configure>", self._on_scroll_frame_configure)
+
+        # No history label (placed on canvas, centered)
+        self.no_history_label = tk.Label(
+            self._canvas,
             text="No history, copy something!",
             bg=self["bg"],
             fg="white",
             font=("Helvetica", 12),
         )
-        self.no_history_label.place(relx=0.5, rely=0.5, anchor="center")
+        self._no_history_window = None  # placeholder for canvas window ID
+
+        # Ensure header is on top
+        self.header_frame.lift()
+
         self._update_no_history()
+        self._update_status()
+
+    def _set_selection(self, item: "UI_ClipboardItem"):
+        """Set the selected item and update accent colors."""
+        # Reset previous selection
+        if self.selected_item:
+            self.selected_item._update_accent()
+        
+        # Set new selection
+        self.selected_item = item
+        item._update_accent()
+
+    def _on_canvas_configure(self, event):
+        """Update scroll frame width to match canvas width and center no_history label."""
+        self._canvas.itemconfig(self._canvas_window, width=event.width)
+        # Center the no_history label in the canvas viewport
+        if self._no_history_window is not None:
+            self._canvas.coords(self._no_history_window, event.width / 2, event.height / 2)
+
+    def _on_scroll_frame_configure(self, event):
+        """Update canvas scroll region when scroll frame size changes."""
+        self._canvas.configure(scrollregion=self._canvas.bbox("all"))
+
+    def _on_mousewheel(self, event):
+        """Handle mousewheel scroll events."""
+        if event.num == 4:
+            self._canvas.yview_scroll(-1, "units")
+        elif event.num == 5:
+            self._canvas.yview_scroll(1, "units")
+        else:
+            self._canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
+
     def add(self, cbitem=None, item=None) -> "UI_ClipboardItem":
         if item is None:
-            item = UI_ClipboardItem(self, cbitem)
+            item = UI_ClipboardItem(self, cbitem, parent=self._scroll_frame)
             # Insert at top of unpinned items (after pinned)
             insert_idx = 0
             for i, existing_item in enumerate(self.items):
@@ -338,10 +460,21 @@ class UI_ClipboardWidget(tk.Frame):
             else:
                 insert_idx = len(self.items)
             self.items.insert(insert_idx, item)
+            # Set initial accent color
+            item._update_accent()
+            # Check if this item should be selected (matches clipboard selection)
+            if cbitem and clipboard.selection and cbitem.hash == clipboard.selection.hash:
+                self._set_selection(item)
         else:
             item.update_with_cbitem(cbitem)
+            # Update accent in case pin state changed
+            item._update_accent()
+            # Check if this updated item should be selected
+            if cbitem and clipboard.selection and cbitem.hash == clipboard.selection.hash:
+                self._set_selection(item)
         self._repack_items()
         self._update_no_history()
+        self._update_status()
         return item
 
     def remove(self, item: "UI_ClipboardItem"):
@@ -350,12 +483,40 @@ class UI_ClipboardWidget(tk.Frame):
             item.destroy()
             self._repack_items()
             self._update_no_history()
+            self._update_status()
 
     def _update_no_history(self):
         if len(self.items) == 0:
             self.no_history_label.configure(text="No history, copy something!")
+            # Create or show the canvas window
+            if self._no_history_window is None:
+                self._no_history_window = self._canvas.create_window(
+                    self._canvas.winfo_width() / 2,
+                    self._canvas.winfo_height() / 2,
+                    window=self.no_history_label
+                )
         else:
-            self.no_history_label.configure(text="")
+            # Hide the label by removing the canvas window
+            if self._no_history_window is not None:
+                self._canvas.delete(self._no_history_window)
+                self._no_history_window = None
+
+    def _update_status(self):
+        x = len(self.items)
+        max_items = config.MAX_ITEMS
+        y = sum(1 for item in self.items if item._pinned)
+        total_memory = sum(item.cbitem.total_size for item in self.items if hasattr(item, 'cbitem'))
+        # Calculate cached memory size by summing each cached representation
+        a = sum(rep.size for item in self.items if hasattr(item, 'cbitem') for rep in item.cbitem.types if rep.cached)
+        # Show only non-cached memory
+        used_memory = total_memory - a
+        z = _format_bytes(used_memory, symbols=False)
+        max_memory_mb = config.MEM_THRESHOLD_MB
+        max_memory = _format_bytes(max_memory_mb * 1e6)
+        a_formatted = _format_bytes(a)
+
+        self.status_left.configure(text=f"Clipboard {x}/{max_items} ({y} pinned)")
+        self.status_right.configure(text=f"{z}/{max_memory} ({a_formatted} cached)")
 
     def add_async(self, cbitem, item=None):
         self.after(0, lambda c=cbitem, i=item: self.add(c, i))
