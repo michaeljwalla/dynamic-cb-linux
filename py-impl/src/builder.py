@@ -19,13 +19,14 @@ class BuilderState(Enum):
 
 
 check = api.check
+
 def _build_snapshot_types(priority:list[str],targets:list[str]) -> Generator[tuple[Representation|BuilderState, bool|str, str], None, BuilderState]:
     count_p = len(priority)
     #
     dupe = set()
     aliases = {}
     for i,target in enumerate(priority+targets):
-        if target in dupe: continue
+        if target in config.MIME_IGNORE or target in dupe: continue
         else: dupe.add(target)
         #
         if api.check():

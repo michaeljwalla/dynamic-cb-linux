@@ -1,4 +1,5 @@
 from ast import Pass
+from calendar import c
 import os
 import tkinter as tk
 from PIL import Image, ImageTk
@@ -8,6 +9,7 @@ from src.classes.models import CBItem, _format_bytes
 import src.processes.watcher as watcher
 import src.processes.server as server
 import src.processes.offload as offloader
+import src.x11api as api
 from src import config
 from src import ui_themes
 
@@ -194,6 +196,7 @@ class UI_PinButton(tk.Label):
         self._photo = photo
 
 
+
 class UI_ClipboardItem(tk.Frame):
     _height    = 80
     _bg        = COLOR_ITEM
@@ -213,7 +216,16 @@ class UI_ClipboardItem(tk.Frame):
         self._preview: tk.Label | None = None
         self._pinned   = False
         self.cbitem = cbitem
-        self.on_pin_clicked = lambda: clipboard.togglepin(self.cbitem) if self.cbitem else None  # custom callback, override as needed
+
+        def _togglepin():
+            if not self.cbitem: return
+            clipboard.togglepin(self.cbitem)
+            self.cbitem.timestamp = api.get_timestamp()
+            if self.cbitem.pinned:
+                offloader.persist(self.cbitem)
+            else:
+                offloader.evict(self.cbitem)
+        self.on_pin_clicked = _togglepin
 
         self.pack_propagate(False)
         self.options = UI_OptionsButton(self)
@@ -549,12 +561,12 @@ class UI_ClipboardWidget(tk.Frame):
         used_memory = total_memory - a
         z = _format_bytes(used_memory, symbols=True)
         max_memory_mb = config.MEM_THRESHOLD_MB
-        max_memory = _format_bytes(max_memory_mb * 1e6)
+        memory_use_percent = int(used_memory / (max_memory_mb*1e6) * 100)
         a_formatted = _format_bytes(a)
         y = sum(1 for item in self.items if item._pinned)
 
-        self.status_left.configure(text=f"{x}/{max_items} | {y} pinned")
-        self.status_right.configure(text=f"{z}/{max_memory} ({a_formatted} disk)")
+        self.status_left.configure(text=f"{x}/{max_items}")# / {y} Pins")
+        self.status_right.configure(text=f"{z} / {memory_use_percent}% ({a_formatted} disk)")
     def _schedule_status_update(self):
         self._update_status()
         self.after(500, self._schedule_status_update)  # Reschedule every 500ms
@@ -578,6 +590,15 @@ root.configure(bg=COLOR_BG)
 
 ui_clipboard = UI_ClipboardWidget(root)
 
+items:CBItem = offloader.generate_persistent()
+for i in sorted(items, key=lambda x: x.timestamp):
+    ui_item = ui_clipboard.add(i)
+    i.pinned = False # so we can use the ui toggle
+    clipboard.append(i)
+    ui_clipboard.add(i, ui_item)
+    ui_item._on_pin_click()
+#
+offloader.cleanup_remnants(clipboard, clear_unpinned=False)
 
 # Start watcher with alerting
 watcher.start(clipboard, alerting)

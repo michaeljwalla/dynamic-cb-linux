@@ -1,10 +1,13 @@
 import threading
 from pathlib import Path
 import re
+from tkinter import N
 
 from src import config
 from src.classes.models import CBItem, Representation, Alias
 from src.classes.clipboard import Clipboard
+
+import json
 
 rwpath: Path = Path.home() / config.CACHE_DIRECTORY / "blobs"
 rwpath.mkdir(parents=True, exist_ok=True)
@@ -44,7 +47,7 @@ def sanitize(mime_type: str) -> str:
 
     return sanitized or "SANITIZE_EMPTY"
 
-def offload(item: CBItem, types:list[str]=None, overwrite=False) -> dict[str, bool]:
+def offload(item: CBItem, types:list[str]=None, overwrite=False, keepcache=False) -> dict[str, bool]:
     if item._processing(): return {}                                    # not ready
     if types is None: types = [i.mime_type for i in item.types]       # default all
     #
@@ -73,10 +76,10 @@ def offload(item: CBItem, types:list[str]=None, overwrite=False) -> dict[str, bo
                 fail = True
         if fail:
             continue
-        #
-        r.data = None
-        r.cached = False
-        r.path = str(file)
+        elif not keepcache:
+            r.data = None
+            r.cached = False
+            r.path = str(file)
         success[r.mime_type] = True
     
     item._ready.set()
@@ -99,9 +102,10 @@ def load(item: CBItem, types:list[str]=None) -> dict[str, bool]:
     attempt_reads: list[Representation] = []
     for r in item.types:
         if (r.mime_type not in success): continue
-        if isinstance(r, Alias): continue
+        if isinstance(r, Alias):
+            continue
         attempt_reads.append(r)
-    
+
     for r in attempt_reads:
         file: Path = dir / (sanitize(r.mime_type) + ".bin")
         fail = False
@@ -119,6 +123,7 @@ def load(item: CBItem, types:list[str]=None) -> dict[str, bool]:
             continue
         #
         r.cached = True
+        r.size = len(r.data)
         r.path = str(file)
         success[r.mime_type] = True
     
@@ -147,6 +152,104 @@ def clear(item: CBItem, load=False) -> bool:
 
     item._ready.set()
     return True
+
+def _json_metadata(item: CBItem) -> str:
+    meta = {
+        "id": item.id,
+        "hash": item.hash,
+        "timestamp": item.timestamp,
+        "types": [r.mime_type for r in item.types],
+        "primary_type": item.primary_type,
+        "total_size": item.total_size,
+        "pinned": item.pinned
+    }
+    return json.dumps(meta)
+
+#does NOT make aliases
+def _json_to_CBItem(json_str: str, available_types: set[str]) -> CBItem:
+    meta = json.loads(json_str)
+    types = []
+    aliases = {}
+
+    for m in available_types:
+        types.append(
+            Representation(mime_type=m, data=None, size=0, path="", cached=False)
+        )
+        if m.lower() in config.MIME_ALIASES:
+            aliases[len(types)-1] = config.MIME_ALIASES[m.lower()]
+        #
+    #
+    for ref_idx in aliases:
+        for alias in aliases[ref_idx]:
+            types.append(
+                Alias(mime_type=alias, ref=types[ref_idx])
+            )
+    
+    item = CBItem(
+        id=meta["id"],
+        hash=meta["hash"],
+        timestamp=int(float(meta["timestamp"])),
+        types=types,
+        primary_type=meta["primary_type"],
+        total_size=meta["total_size"],
+        pinned=meta["pinned"]
+    )
+    return item
+def persist(item:CBItem) -> bool:
+    if item._processing(): return False
+#
+    dir = rwpath / item.hash
+    dir.mkdir(exist_ok=True,parents=True)
+    persist_marker = dir / "persist.json"
+    persist_marker.write_text( _json_metadata(item) )
+    offload(item, keepcache=True)
+    return True
+
+def evict(item:CBItem) -> bool:
+    if item._processing(): return False
+    dir = rwpath / item.hash
+    if not dir.exists(): return True
+    persist_marker = dir / "persist.json"
+    persist_marker.unlink(missing_ok=True)
+    return True
+
+unsanitize = lambda s: s.replace("_", "/", 1)
+def generate_CBItem(hash:str)->CBItem|None:
+    dir:Path = rwpath / hash
+    if not dir.exists(): return None
+    try:
+
+        available_types = set([ unsanitize(i.name[:-4]) for i in dir.iterdir() if i.name.endswith(".bin")])
+        # sanitized mime types such that / is _
+        item = _json_to_CBItem((rwpath / hash / "persist.json").read_text(), available_types)
+        item._ready.set()
+        load(item)
+        item.total_size = item.get_cached_size()
+    except Exception as e:
+        print(f"Error generating CBItem for hash {hash}: {e}")
+        return None
+    return item
+
+tempEvict = CBItem(id=-1,hash="",timestamp=0, types=[], primary_type="", total_size=0, pinned=False)
+tempEvict._ready.set()
+
+def generate_persistent()->list[CBItem]:
+    persistent_items = []
+    for dir in rwpath.iterdir():
+        if dir.is_symlink() or not dir.is_dir(): continue
+        persist_marker = dir / "persist.json"
+        #
+        item = persist_marker.exists() and generate_CBItem(dir.name)
+        if not item:
+            tempEvict.hash = dir.name
+            evict(tempEvict)
+            _clear_by_hash(dir.name)
+            continue
+        persistent_items.append(item)
+    
+    return persistent_items
+        
+
 
 #trust that hash is not present in clipboard
 def _clear_by_hash(hash: str)->bool:
