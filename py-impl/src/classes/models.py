@@ -28,6 +28,33 @@ class Representation:
 {self.cached and "Cached" or "Uncached"}|\
 {self.path and self.path or "No path"}""")
 
+#super-shallow copy of a representation
+class Alias(Representation):
+    __slots__ = ("ref")
+    def __init__(self, mime_type:str, ref: Representation):
+        self.ref = ref
+        self.mime_type = mime_type
+    
+    @property
+    def data(self): return self.ref.data
+    @data.setter
+    def data(self, value): self.ref.data = value
+
+    @property
+    def size(self): return self.ref.size
+    @size.setter
+    def size(self, value): self.ref.size = value
+
+    @property
+    def cached(self): return self.ref.cached
+    @cached.setter
+    def cached(self, value): self.ref.cached = value
+
+    @property
+    def path(self): return self.ref.path
+    @path.setter
+    def path(self, value): self.ref.path = value
+
 class CBItem:
     __slots__ = ("id", "timestamp", "hash", "types", "primary_type", "total_size", "pinned", "_ready")
     def __init__(self, id: int, timestamp: float, hash: str, types: list[Representation],
@@ -45,7 +72,7 @@ class CBItem:
         return not self._ready.is_set()
 
     def get_cached_size(self) -> bool:
-        return sum([i.size for i in self.types if i.cached])
+        return sum([i.size for i in self.types if not isinstance(i, Alias) and i.cached])
     
     def __str__(self):
         return f"""CBItem|{self.pinned and "Pinned" or "Unpinned"}|\

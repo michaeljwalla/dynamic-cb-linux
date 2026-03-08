@@ -19,7 +19,7 @@ def _generate_aliases(l: list[str])->dict[str, list[str]]:
 # compilation of all aliases currently found
 MIME_ALIASES = {}\
     | _generate_aliases(["image/bmp", "image/x-ms-bmp", "image/x-bmp", "image/x-win-bitmap"])\
-    | _generate_aliases([[ "image/x-icon", "image/x-ico", "image/vnd.microsoft.icon", "application/ico", "image/ico", "image/icon", "text/ico" ]])
+    | _generate_aliases([ "image/x-icon", "image/x-ico", "image/vnd.microsoft.icon", "application/ico", "image/ico", "image/icon", "text/ico" ])
 # MIME_TYPES = {
 #     "WILL_HASH": set([
 #         'text/plain',
