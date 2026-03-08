@@ -1,6 +1,10 @@
 import os
 import tkinter as tk
 from PIL import Image, ImageTk
+import src.preview as preview
+from src.classes.clipboard import Clipboard
+import src.processes.watcher as watcher
+import src.processes.server as server
 
 ASSETS_DIR = os.path.join(os.path.dirname(__file__), "ui")
 
@@ -13,6 +17,24 @@ BUTTON_SIZE    = 11   # reduced by ~75%
 BUTTON_PAD_R   = 3    # gap from right edge of frame (halved)
 BUTTON_GAP     = 3    # vertical gap between the two buttons (halved)
 BUTTON_PAD_TOP = 3    # gap from top edge of frame (halved)
+
+
+# Global clipboard and UI state
+clipboard = Clipboard()
+item_dict = {}  # hash -> UI_ClipboardItem
+ui_clipboard = None  # Will be set in demo
+
+def alerting(cbitem):
+    global ui_clipboard
+    hash = cbitem.hash
+    if hash not in item_dict:
+        # First call: add in loading state
+        item = ui_clipboard.add(cbitem)
+        item_dict[hash] = item
+    else:
+        # Second call: update if ready
+        if cbitem._ready.is_set():
+            ui_clipboard.add(cbitem, item_dict[hash])
 
 
 def _load_icon(filename: str, size: int, opacity: float = 1.0) -> ImageTk.PhotoImage:
@@ -96,7 +118,7 @@ class UI_ClipboardItem(tk.Frame):
     _bg_hover  = COLOR_HOVER
     _bg_accent = COLOR_ACCENT
 
-    def __init__(self, cb: "UI_ClipboardWidget"):
+    def __init__(self, cb: "UI_ClipboardWidget", cbitem=None):
         super().__init__(
             cb,
             bg=self._bg,
@@ -107,7 +129,8 @@ class UI_ClipboardItem(tk.Frame):
         self._cb       = cb
         self._preview: tk.Label | None = None
         self._pinned   = False
-        self.on_pin_clicked = lambda: None  # custom callback, override as needed
+        self.cbitem = cbitem
+        self.on_pin_clicked = lambda: clipboard.togglepin(self.cbitem) if self.cbitem else None  # custom callback, override as needed
 
         self.pack_propagate(False)
         self.options = UI_OptionsButton(self)
@@ -121,7 +144,12 @@ class UI_ClipboardItem(tk.Frame):
         # Bind interactions
         self.bind("<Enter>", lambda _e: self._hover(True))
         self.bind("<Leave>", lambda _e: self._hover(False))
+        self.bind("<Button-1>", lambda _e: self._on_click())
         self.pin.bind("<Button-1>", lambda _e: self._on_pin_click())
+
+        # Set initial loading preview
+        if cbitem:
+            self.set_preview("Loading...", is_path=False)
 
     def _hover(self, active: bool):
         color = self._bg_hover if active else self._bg
@@ -154,6 +182,23 @@ class UI_ClipboardItem(tk.Frame):
         self._cb._repack_items()
         self.on_pin_clicked()
 
+    def _on_click(self):
+        """Set the clipboard selection to this item."""
+        if self.cbitem and self.cbitem._ready.is_set():
+            cbitem = clipboard.getByHash(self.cbitem.hash)
+            if cbitem:
+                clipboard.focus(cbitem)
+                server.set(cbitem)
+            else:
+                # Reset or ignore
+                pass
+        # If not ready, ignore
+
+    def update_with_cbitem(self, cbitem):
+        self.cbitem = cbitem
+        result, is_path = preview.generate(cbitem)
+        self.set_preview(result, is_path=is_path)
+
     def set_preview(self, text: str = "", text_truncate: int = 40, is_path: bool = False):
         """
         Set the left-side preview content.
@@ -171,9 +216,17 @@ class UI_ClipboardItem(tk.Frame):
         right_gap = BUTTON_SIZE + BUTTON_PAD_R + 6  # room for buttons + small gap
 
         if is_path:
-            photo = _load_icon("ellipses.png", 32)
-            lbl = tk.Label(self, image=photo, bg=self["bg"], anchor="nw")
-            lbl._photo = photo  # prevent GC
+            if os.path.exists(text):
+                img = Image.open(text)
+                img.thumbnail((196, 68))  # fit within available space
+                photo = ImageTk.PhotoImage(img)
+                lbl = tk.Label(self, image=photo, bg=self["bg"], anchor="nw")
+                lbl._photo = photo
+            else:
+                # placeholder
+                photo = _load_icon("ellipses.png", 32)
+                lbl = tk.Label(self, image=photo, bg=self["bg"], anchor="nw")
+                lbl._photo = photo
         else:
             display = text[:text_truncate] + "..." if len(text) > text_truncate else text
             lbl = tk.Label(
@@ -203,10 +256,34 @@ class UI_ClipboardWidget(tk.Frame):
         self.pack_propagate(False)
         self.pack()
 
-    def add(self) -> "UI_ClipboardItem":
-        item = UI_ClipboardItem(self)
-        self.items.append(item)
+    def add(self, cbitem=None, item=None) -> "UI_ClipboardItem":
+        if item is None:
+            item = UI_ClipboardItem(self, cbitem)
+            # Insert at top of unpinned items (after pinned)
+            insert_idx = 0
+            for i, existing_item in enumerate(self.items):
+                if not existing_item._pinned:
+                    insert_idx = i
+                    break
+            else:
+                insert_idx = len(self.items)
+            self.items.insert(insert_idx, item)
+        else:
+            item.update_with_cbitem(cbitem)
+        self._repack_items()
         return item
+
+    def remove(self, item: "UI_ClipboardItem"):
+        if item in self.items:
+            self.items.remove(item)
+            item.destroy()
+            self._repack_items()
+
+    def add_async(self, cbitem, item=None):
+        self.after(0, lambda: self.add(cbitem, item))
+
+    def remove_async(self, item):
+        self.after(0, lambda: self.remove(item))
 
     def _repack_items(self):
         """Repack all items in order to match self.items list order."""
@@ -222,12 +299,10 @@ root.configure(bg=COLOR_BG)
 
 ui_clipboard = UI_ClipboardWidget(root)
 
-item1 = ui_clipboard.add()
-item1.set_preview("Hello, this is a clipboard entry that is somewhat long", text_truncate=30)
-
-item2 = ui_clipboard.add()
-item2.set_preview("/home/user/documents/screenshot.jpg", is_path=True)
-
-ui_clipboard.add()  # bare item, no preview yet
+# Start watcher with alerting
+watcher.start(clipboard, alerting)
 
 root.mainloop()
+
+#TODO: connect main_ui.py with preview module and clipboard module and write data
+# rememebre the ... mode in which you should not read data and just keep as ellipses / (writing........)

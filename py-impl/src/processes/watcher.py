@@ -10,7 +10,7 @@ _watcher_stop:   threading.Event  | None = None
 
 from time import perf_counter_ns as tick
 
-def start(clipboard: Clipboard):
+def start(clipboard: Clipboard, alerting=None):
     global _watcher_thread, _watcher_stop
 
     if _watcher_stop:
@@ -20,7 +20,7 @@ def start(clipboard: Clipboard):
 
     stop = threading.Event()
     _watcher_stop = stop
-    _watcher_thread = threading.Thread(target=_poll_loop, args=(clipboard, stop), daemon=True)
+    _watcher_thread = threading.Thread(target=_poll_loop, args=(clipboard, stop, alerting), daemon=True)
     _watcher_thread.start()
 
 
@@ -30,7 +30,7 @@ def stop():
         _watcher_stop.set()
 
 
-def _poll_loop(clipboard: Clipboard, stop: threading.Event):
+def _poll_loop(clipboard: Clipboard, stop: threading.Event, alerting=None):
     while not stop.is_set():
         stop.wait(config.WATCH_POLL_INTERVAL)
         if stop.is_set():
@@ -75,6 +75,10 @@ def _poll_loop(clipboard: Clipboard, stop: threading.Event):
                         clipboard.append(snapshot)
                         appended = True
 
+                        # Alert loading state
+                        if alerting:
+                            alerting(snapshot)
+
                         # Release the clipboard lock so observers can see the new slot.
                         # The item itself remains Processing until all types are fetched.
                         clipboard._ready.set()
@@ -98,3 +102,6 @@ def _poll_loop(clipboard: Clipboard, stop: threading.Event):
             # Mark item ready only if we own it (not a duplicate reuse)
             if appended and snapshot is not None:
                 snapshot._ready.set()
+                # Alert finished state
+                if alerting:
+                    alerting(snapshot)

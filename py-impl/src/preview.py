@@ -33,8 +33,8 @@ def generate(item: CBItem) -> tuple[str, bool]:
         # Process the image
         try:
             img = Image.open(io.BytesIO(image_rep.data))
-            # Calculate new size to approximately 20700 pixels (192*108 ≈ 20736)
-            target_pixels = 20700
+            # Calculate new size to approximately 46575 pixels (216*216 ≈ 46656)
+            target_pixels = 46575
             w, h = img.size
             current_pixels = w * h
             if current_pixels > target_pixels:
