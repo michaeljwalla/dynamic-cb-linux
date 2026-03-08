@@ -128,7 +128,7 @@ def fetch_data(target_name, timeout=config.WATCH_TIMEOUT) -> Representation | No
             return None  # owner never responded within timeout
 
         if event.property == X.NONE:
-            continue  # Clipboard doesn't support this type
+            break  # Clipboard doesn't support this type
 
         #restart timeout window
         prop = window.get_full_property(target_atom, X.AnyPropertyType)
@@ -147,6 +147,6 @@ def fetch_data(target_name, timeout=config.WATCH_TIMEOUT) -> Representation | No
             window.delete_property(target_atom)
             d.flush()
 
-        return Representation(target_name, data, len(data), False, "")
+        return Representation(target_name, data, len(data), True, "")
     else:
         return None

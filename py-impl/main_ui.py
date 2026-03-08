@@ -1,11 +1,13 @@
+from ast import Pass
 import os
 import tkinter as tk
 from PIL import Image, ImageTk
 import src.preview as preview
 from src.classes.clipboard import Clipboard
-from src.classes.models import _format_bytes
+from src.classes.models import CBItem, _format_bytes
 import src.processes.watcher as watcher
 import src.processes.server as server
+import src.processes.offload as offloader
 from src import config
 
 ASSETS_DIR = os.path.join(os.path.dirname(__file__), "ui")
@@ -26,7 +28,7 @@ BUTTON_PAD_TOP = 3    # gap from top edge of frame (halved)
 
 # Global clipboard and UI state
 clipboard = Clipboard()
-item_dict = {}  # hash -> UI_ClipboardItem
+item_dict:dict[str, "UI_ClipboardItem"] = {}  # hash -> UI_ClipboardItem
 ui_clipboard = None  # Will be set in demo
 
 def alerting(cbitem):
@@ -42,6 +44,31 @@ def alerting(cbitem):
             ui_clipboard.add(cbitem, item_dict[hash])
     ui_clipboard._update_no_history()
     ui_clipboard._update_status()
+
+#update_preview; update_with_cbitem
+
+offload_dict:dict[str, CBItem] = {} #hash -> UI_ClipboardItem
+def offloading(state:bool, items:list[CBItem]=None):
+    global ui_clipboard
+    if not state:
+        for item in offload_dict.values():
+            if item.hash not in item_dict: continue
+            ui = item_dict[item.hash]
+            ui.update_with_cbitem(item)
+        offload_dict.clear()
+        ui_clipboard._update_status()
+        return
+    #
+    for item in items:
+        if item.hash not in item_dict: return
+
+        offload_dict[item.hash] = item
+        ui = item_dict[item.hash]
+        ui.set_preview("( ... offloading ... )", is_path=False)
+    ui_clipboard._update_status()
+    return
+
+    
 
 
 def _load_icon(filename: str, size: int, opacity: float = 1.0) -> ImageTk.PhotoImage:
@@ -270,6 +297,7 @@ class UI_ClipboardItem(tk.Frame):
             cbitem = clipboard.getByHash(self.cbitem.hash)
             if cbitem:
                 clipboard.focus(cbitem)
+                offloader.load(cbitem) # loads into memory if not already
                 server.set(cbitem)
                 # Update UI selection
                 self._cb._set_selection(self)
@@ -343,7 +371,7 @@ class UI_ClipboardItem(tk.Frame):
 
 
 class UI_ClipboardWidget(tk.Frame):
-    def __init__(self, root: tk.Tk, w: int = int(240*1.5), h: int = int(300*1.5)):
+    def __init__(self, root: tk.Tk, w: int = int(300*1.5), h: int = int(360*1.5)):
         super().__init__(root, bg=COLOR_BG, width=w, height=h)
         self.items: list[UI_ClipboardItem] = []
         self.selected_item: UI_ClipboardItem | None = None  # Track currently selected item
@@ -416,17 +444,18 @@ class UI_ClipboardWidget(tk.Frame):
         self.header_frame.lift()
 
         self._update_no_history()
-        self._update_status()
+        self._update_status()  # Initial update
+        self.after(500, self._schedule_status_update)  # Start scheduling after 500ms
 
     def _set_selection(self, item: "UI_ClipboardItem"):
         """Set the selected item and update accent colors."""
         # Reset previous selection
-        if self.selected_item:
-            self.selected_item._update_accent()
+        last = self.selected_item
+        self.selected_item = item
         
         # Set new selection
-        self.selected_item = item
         item._update_accent()
+        if last: last._update_accent()
 
     def _on_canvas_configure(self, event):
         """Update scroll frame width to match canvas width and center no_history label."""
@@ -463,15 +492,23 @@ class UI_ClipboardWidget(tk.Frame):
             # Set initial accent color
             item._update_accent()
             # Check if this item should be selected (matches clipboard selection)
-            if cbitem and clipboard.selection and cbitem.hash == clipboard.selection.hash:
-                self._set_selection(item)
+            # if cbitem and cbitem.hash == clipboard.selection.hash:
+            #     self._set_selection(item)
         else:
             item.update_with_cbitem(cbitem)
             # Update accent in case pin state changed
             item._update_accent()
             # Check if this updated item should be selected
-            if cbitem and clipboard.selection and cbitem.hash == clipboard.selection.hash:
-                self._set_selection(item)
+            # if cbitem and cbitem.hash == clipboard.selection.hash:
+            #     self._set_selection(item)
+
+            #assuming a new item added = something else was copied
+            if self.selected_item:
+                item = self.selected_item
+                self.selected_item = None
+                clipboard.focus(None)
+                item._update_accent()
+            #
         self._repack_items()
         self._update_no_history()
         self._update_status()
@@ -507,17 +544,19 @@ class UI_ClipboardWidget(tk.Frame):
         y = sum(1 for item in self.items if item._pinned)
         total_memory = sum(item.cbitem.total_size for item in self.items if hasattr(item, 'cbitem'))
         # Calculate cached memory size by summing each cached representation
-        a = sum(rep.size for item in self.items if hasattr(item, 'cbitem') for rep in item.cbitem.types if rep.cached)
+        a = sum(i.cbitem.total_size - i.cbitem.get_cached_size() for i in self.items)
         # Show only non-cached memory
         used_memory = total_memory - a
-        z = _format_bytes(used_memory, symbols=False)
+        z = _format_bytes(used_memory, symbols=True)
         max_memory_mb = config.MEM_THRESHOLD_MB
         max_memory = _format_bytes(max_memory_mb * 1e6)
         a_formatted = _format_bytes(a)
 
         self.status_left.configure(text=f"Clipboard {x}/{max_items} ({y} pinned)")
-        self.status_right.configure(text=f"{z}/{max_memory} ({a_formatted} cached)")
-
+        self.status_right.configure(text=f"{z}/{max_memory} ({a_formatted} disk)")
+    def _schedule_status_update(self):
+        self._update_status()
+        self.after(500, self._schedule_status_update)  # Reschedule every 500ms
     def add_async(self, cbitem, item=None):
         self.after(0, lambda c=cbitem, i=item: self.add(c, i))
 
@@ -538,8 +577,9 @@ root.configure(bg=COLOR_BG)
 
 ui_clipboard = UI_ClipboardWidget(root)
 
+
 # Start watcher with alerting
 watcher.start(clipboard, alerting)
-
+offloader.start(clipboard, offloading)
 root.mainloop()
 

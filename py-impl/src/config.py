@@ -1,9 +1,10 @@
-DEBUG = False
+DEBUG = True
 
 
-MEM_THRESHOLD_MB = 300
-MEM_DUMP_THRESHOLD_MB = 150
+MEM_THRESHOLD_MB = 250
+MEM_DUMP_THRESHOLD_MB = 100
 MAX_ITEMS = 50
+MEM_OFFLOAD_THRESHOLD_MB = MEM_DUMP_THRESHOLD_MB / MAX_ITEMS #once offload is triggered, things over this size go away
 
 CACHE_DIRECTORY = ".cb_history" # in home dir
 
@@ -12,6 +13,13 @@ PREVIEW = {
     "MAX_IMGAREA": 256**2   # preview media will shrink to be <= dimensional area
 }
 
+# dict where each element points back to list
+def _generate_aliases(l: list[str])->dict[str, list[str]]:
+    return dict(zip(l, [l for _ in l]))
+# compilation of all aliases currently found
+MIME_ALIASES = {}\
+    | _generate_aliases(["image/bmp", "image/x-ms-bmp", "image/x-bmp", "image/x-win-bitmap"])\
+    | _generate_aliases([[ "image/x-icon", "image/x-ico", "image/vnd.microsoft.icon", "application/ico", "image/ico", "image/icon", "text/ico" ]])
 # MIME_TYPES = {
 #     "WILL_HASH": set([
 #         'text/plain',
