@@ -370,7 +370,7 @@ class UI_ClipboardItem(tk.Frame):
 
 
 class UI_ClipboardWidget(tk.Frame):
-    def __init__(self, root: tk.Tk, w: int = int(300*1.5), h: int = int(360*1.5)):
+    def __init__(self, root: tk.Tk, w: int = int(300), h: int = int(360)):
         super().__init__(root, bg=COLOR_BG, width=w, height=h)
         self.items: list[UI_ClipboardItem] = []
         self.selected_item: UI_ClipboardItem | None = None  # Track currently selected item
@@ -542,7 +542,6 @@ class UI_ClipboardWidget(tk.Frame):
     def _update_status(self):
         x = len(self.items)
         max_items = config.MAX_ITEMS
-        y = sum(1 for item in self.items if item._pinned)
         total_memory = sum(item.cbitem.total_size for item in self.items if hasattr(item, 'cbitem'))
         # Calculate cached memory size by summing each cached representation
         a = sum(i.cbitem.total_size - i.cbitem.get_cached_size() for i in self.items)
@@ -552,8 +551,9 @@ class UI_ClipboardWidget(tk.Frame):
         max_memory_mb = config.MEM_THRESHOLD_MB
         max_memory = _format_bytes(max_memory_mb * 1e6)
         a_formatted = _format_bytes(a)
+        y = sum(1 for item in self.items if item._pinned)
 
-        self.status_left.configure(text=f"Clipboard {x}/{max_items} ({y} pinned)")
+        self.status_left.configure(text=f"{x}/{max_items} | {y} pinned")
         self.status_right.configure(text=f"{z}/{max_memory} ({a_formatted} disk)")
     def _schedule_status_update(self):
         self._update_status()
