@@ -35,6 +35,7 @@ def alerting(cbitem):
         # Second call: update if ready
         if cbitem._ready.is_set():
             ui_clipboard.add(cbitem, item_dict[hash])
+    ui_clipboard._update_no_history()
 
 
 def _load_icon(filename: str, size: int, opacity: float = 1.0) -> ImageTk.PhotoImage:
@@ -46,6 +47,56 @@ def _load_icon(filename: str, size: int, opacity: float = 1.0) -> ImageTk.PhotoI
         a = a.point(lambda p: int(p * opacity))
     white = Image.new("L", img.size, 255)
     return ImageTk.PhotoImage(Image.merge("RGBA", (white, white, white, a)))
+
+
+class UI_OptionsMenu(tk.Toplevel):
+    """Context menu for options button with Pin/Unpin, Save, Delete."""
+    
+    def __init__(self, parent: tk.Frame, cbitem, item: "UI_ClipboardItem"):
+        super().__init__(parent, bg=COLOR_ITEM, relief="raised", borderwidth=1)
+        self.cbitem = cbitem
+        self.item = item
+        
+        # Remove window decorations
+        self.overrideredirect(True)
+        self.attributes("-topmost", True)
+        
+        pin_text = "Unpin" if cbitem.pinned else "Pin"
+        self.pin_btn = tk.Button(self, text=pin_text, command=self._on_pin, bg=COLOR_ITEM, fg="white", relief="flat")
+        self.save_btn = tk.Button(self, text="Save", command=self._on_save, bg=COLOR_ITEM, fg="white", relief="flat")
+        self.delete_btn = tk.Button(self, text="Delete", command=self._on_delete, bg=COLOR_ITEM, fg="white", relief="flat")
+        
+        self.pin_btn.pack(fill=tk.X, padx=5, pady=2)
+        self.save_btn.pack(fill=tk.X, padx=5, pady=2)
+        self.delete_btn.pack(fill=tk.X, padx=5, pady=2)
+        
+        # Position relative to the options button
+        options_btn = item.options
+        # Get absolute position
+        x = options_btn.winfo_rootx() + options_btn.winfo_width() + 5
+        y = options_btn.winfo_rooty()
+        self.geometry(f"+{x}+{y}")
+        
+        # Bind to destroy on focus out
+        self.bind("<FocusOut>", lambda e: self.destroy())
+        self.focus_set()
+    
+    def _on_pin(self):
+        self.item._on_pin_click()
+        self.destroy()
+    
+    def _on_save(self):
+        # TODO: Implement save functionality
+        print("Save not implemented")
+        self.destroy()
+    
+    def _on_delete(self):
+        # Remove from UI
+        self.item._cb.remove(self.item)
+        # Remove from clipboard
+        clipboard.remove(self.cbitem)
+        self.item._cb._update_no_history()
+        self.destroy()
 
 
 class UI_OptionsButton(tk.Label):
@@ -146,10 +197,11 @@ class UI_ClipboardItem(tk.Frame):
         self.bind("<Leave>", lambda _e: self._hover(False))
         self.bind("<Button-1>", lambda _e: self._on_click())
         self.pin.bind("<Button-1>", lambda _e: self._on_pin_click())
+        self.options.bind("<Button-1>", lambda _e: self._on_options_click())
 
         # Set initial loading preview
         if cbitem:
-            self.set_preview("Loading...", is_path=False)
+            self.set_preview("( ... processing ... )" , is_path=False)
 
     def _hover(self, active: bool):
         color = self._bg_hover if active else self._bg
@@ -193,6 +245,11 @@ class UI_ClipboardItem(tk.Frame):
                 # Reset or ignore
                 pass
         # If not ready, ignore
+
+    def _on_options_click(self):
+        """Open the options menu."""
+        if self.cbitem:
+            UI_OptionsMenu(self, self.cbitem, self)
 
     def update_with_cbitem(self, cbitem):
         self.cbitem = cbitem
@@ -240,6 +297,10 @@ class UI_ClipboardItem(tk.Frame):
                 wraplength=180,
             )
 
+        # Make the preview clickable
+        lbl.bind("<Button-1>", lambda e: self._on_click())
+        lbl.configure(cursor="hand2")
+
         # relwidth=1 with negative width offset fills the frame minus reserved areas
         lbl.place(
             x=PAD_L, y=PAD_V,
@@ -250,12 +311,21 @@ class UI_ClipboardItem(tk.Frame):
 
 
 class UI_ClipboardWidget(tk.Frame):
-    def __init__(self, root: tk.Tk, w: int = 240, h: int = 400):
+    def __init__(self, root: tk.Tk, w: int = int(240*1.5), h: int = int(300*1.5)):
         super().__init__(root, bg=COLOR_BG, width=w, height=h)
         self.items: list[UI_ClipboardItem] = []
         self.pack_propagate(False)
         self.pack()
-
+        # No history label
+        self.no_history_label = tk.Label(
+            self,
+            text="No history, copy something!",
+            bg=self["bg"],
+            fg="white",
+            font=("Helvetica", 12),
+        )
+        self.no_history_label.place(relx=0.5, rely=0.5, anchor="center")
+        self._update_no_history()
     def add(self, cbitem=None, item=None) -> "UI_ClipboardItem":
         if item is None:
             item = UI_ClipboardItem(self, cbitem)
@@ -271,6 +341,7 @@ class UI_ClipboardWidget(tk.Frame):
         else:
             item.update_with_cbitem(cbitem)
         self._repack_items()
+        self._update_no_history()
         return item
 
     def remove(self, item: "UI_ClipboardItem"):
@@ -278,12 +349,19 @@ class UI_ClipboardWidget(tk.Frame):
             self.items.remove(item)
             item.destroy()
             self._repack_items()
+            self._update_no_history()
+
+    def _update_no_history(self):
+        if len(self.items) == 0:
+            self.no_history_label.configure(text="No history, copy something!")
+        else:
+            self.no_history_label.configure(text="")
 
     def add_async(self, cbitem, item=None):
-        self.after(0, lambda: self.add(cbitem, item))
+        self.after(0, lambda c=cbitem, i=item: self.add(c, i))
 
     def remove_async(self, item):
-        self.after(0, lambda: self.remove(item))
+        self.after(0, lambda i=item: self.remove(i))
 
     def _repack_items(self):
         """Repack all items in order to match self.items list order."""
