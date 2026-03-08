@@ -543,5 +543,3 @@ watcher.start(clipboard, alerting)
 
 root.mainloop()
 
-#TODO: connect main_ui.py with preview module and clipboard module and write data
-# rememebre the ... mode in which you should not read data and just keep as ellipses / (writing........)
