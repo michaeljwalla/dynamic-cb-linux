@@ -9,16 +9,11 @@ import src.processes.watcher as watcher
 import src.processes.server as server
 import src.processes.offload as offloader
 from src import config
+from src import ui_themes
 
 ASSETS_DIR = os.path.join(os.path.dirname(__file__), "ui")
 
-COLOR_BG     = "#1e2d3e"   # widget background (darkest)
-COLOR_ITEM   = "#2f4a6a"   # item base color
-COLOR_ACCENT = "#4a7ab5"   # accent / highlight border (lighter)
-COLOR_PIN    = "#b57a4a"   # warm amber — pinned item border highlight
-COLOR_SELECT = "#7ab54a"   # green accent — selected item border highlight (highest priority)
-COLOR_HOVER  = "#3d6a9b"   # item hover color
-COLOR_STATUS = "#253545"   # status bar background (slightly lighter than bg)
+COLOR_BG, COLOR_ITEM, COLOR_ACCENT, COLOR_PIN, COLOR_SELECT, COLOR_HOVER, COLOR_STATUS, COLOR_TEXT = ui_themes.Dracula
 
 BUTTON_SIZE    = 11   # reduced by ~75%
 BUTTON_PAD_R   = 3    # gap from right edge of frame (halved)
@@ -95,9 +90,9 @@ class UI_OptionsMenu(tk.Toplevel):
         self.attributes("-topmost", True)
         
         pin_text = "Unpin" if cbitem.pinned else "Pin"
-        self.pin_btn = tk.Button(self, text=pin_text, command=self._on_pin, bg=COLOR_ITEM, fg="white", relief="flat")
-        self.save_btn = tk.Button(self, text="Save", command=self._on_save, bg=COLOR_ITEM, fg="white", relief="flat")
-        self.delete_btn = tk.Button(self, text="Delete", command=self._on_delete, bg=COLOR_ITEM, fg="white", relief="flat")
+        self.pin_btn = tk.Button(self, text=pin_text, command=self._on_pin, bg=COLOR_ITEM, fg=COLOR_TEXT, relief="flat")
+        self.save_btn = tk.Button(self, text="Save", command=self._on_save, bg=COLOR_ITEM, fg=COLOR_TEXT, relief="flat")
+        self.delete_btn = tk.Button(self, text="Delete", command=self._on_delete, bg=COLOR_ITEM, fg=COLOR_TEXT, relief="flat")
         
         self.pin_btn.pack(fill=tk.X, padx=5, pady=2)
         self.save_btn.pack(fill=tk.X, padx=5, pady=2)
@@ -128,6 +123,8 @@ class UI_OptionsMenu(tk.Toplevel):
         self.item._cb.remove(self.item)
         # Remove from clipboard
         clipboard.remove(self.cbitem)
+        offloader.cleanup_remnants(clipboard, clear_unpinned=False)
+
         self.item._cb._update_no_history()
         self.item._cb._update_status()
         self.destroy()
@@ -268,16 +265,9 @@ class UI_ClipboardItem(tk.Frame):
     def _on_pin_click(self):
         """Toggle pin state: pin moves to top (full opacity), unpin moves to bottom (25% opacity)."""
         if self._pinned:
-            # Unpin: move to bottom of unpinned section
+            # Unpin: move to top of unpinned section
             self._pinned = False
             self.pin.set_opacity(0.25)
-            self._update_accent()
-            self._cb.items.remove(self)
-            self._cb.items.append(self)
-        else:
-            # Pin: move to bottom of pinned section (top if no other pinned items)
-            self._pinned = True
-            self.pin.set_opacity(1.0)
             self._update_accent()
             self._cb.items.remove(self)
             # Find first unpinned item and insert before it
@@ -287,9 +277,18 @@ class UI_ClipboardItem(tk.Frame):
                     insert_idx = i
                     break
             self._cb.items.insert(insert_idx, self)
+        else:
+            # Pin: move to top of pinned section (top if no other pinned items)
+            self._pinned = True
+            self.pin.set_opacity(1.0)
+            self._update_accent()
+            self._cb.items.remove(self)
+            # Find first pinned item and insert before it
+            self._cb.items.insert(0, self)
         self._cb._repack_items()
         self._cb._update_status()
         self.on_pin_clicked()
+        self.lift()
 
     def _on_click(self):
         """Set the clipboard selection to this item."""
@@ -350,7 +349,7 @@ class UI_ClipboardItem(tk.Frame):
                 self,
                 text=display,
                 bg=self["bg"],
-                fg="white",
+                fg=COLOR_TEXT,
                 anchor="nw",
                 justify="left",
                 font=("Helvetica", 9),
@@ -392,7 +391,7 @@ class UI_ClipboardWidget(tk.Frame):
             self.status_frame,
             text="",
             bg=COLOR_STATUS,
-            fg="white",
+            fg=COLOR_TEXT,
             font=("Helvetica", 8),
             anchor="w"
         )
@@ -402,7 +401,7 @@ class UI_ClipboardWidget(tk.Frame):
             self.status_frame,
             text="",
             bg=COLOR_STATUS,
-            fg="white",
+            fg=COLOR_TEXT,
             font=("Helvetica", 8),
             anchor="e"
         )
@@ -435,7 +434,7 @@ class UI_ClipboardWidget(tk.Frame):
             self._canvas,
             text="No history, copy something!",
             bg=self["bg"],
-            fg="white",
+            fg=COLOR_TEXT,
             font=("Helvetica", 12),
         )
         self._no_history_window = None  # placeholder for canvas window ID
@@ -517,6 +516,8 @@ class UI_ClipboardWidget(tk.Frame):
     def remove(self, item: "UI_ClipboardItem"):
         if item in self.items:
             self.items.remove(item)
+            if item is self.selected_item:
+                self.selected_item = None
             item.destroy()
             self._repack_items()
             self._update_no_history()
