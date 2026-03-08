@@ -68,6 +68,8 @@ class Clipboard:
 
     def pop(self, idx: int)-> CBItem | None:
         node = self.data[idx].pop()
+        if node:
+            del self._hashes[node.data.hash]
         return node and node.data
     
     def bringToFront(self, value: CBItem):
@@ -96,6 +98,14 @@ class Clipboard:
         else:
             self.data[1].appendLeft( self.data[0].remove( node ) ) #remove from unpinned and append to front
             value.pinned = False
+        return
+    
+    def remove(self, cbitem: CBItem):
+        node = self._hashes.get(cbitem.hash)
+        if node:
+            deque_idx = 0 if cbitem.pinned else 1
+            self.data[deque_idx].remove(node)
+            del self._hashes[cbitem.hash]
         return
     
     def togglepin(self, value: CBItem):
