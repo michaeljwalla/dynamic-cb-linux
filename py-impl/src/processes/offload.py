@@ -12,8 +12,6 @@ rwpath.mkdir(parents=True, exist_ok=True)
 _watcher_thread: threading.Thread | None = None
 _watcher_stop:   threading.Event  | None = None
 
-from time import perf_counter_ns as tick
-
 def start(clipboard: Clipboard):
     global _watcher_thread, _watcher_stop
 
@@ -35,8 +33,6 @@ def stop():
 
 
 def sanitize(mime_type: str) -> str:
-    if not mime_type or not isinstance(mime_type, str):
-        return "SANITIZE_FAIL"
 
     sanitized = mime_type.strip()
     sanitized = sanitized.replace("/", "_")
@@ -174,6 +170,7 @@ def cleanup_remnants(c: Clipboard, clear_unpinned=False):
         if (item and (item.pinned or (not clear_unpinned))): continue #item exists; item is unpinned BUT we arent clearing those
         _clear_by_hash(dir.name)
     return
+
 def _poll_loop(clipboard: Clipboard, stop: threading.Event):
     while not stop.is_set():
         stop.wait(config.OFFLOAD_POLL_INTERVAL)

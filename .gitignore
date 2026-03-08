@@ -3,3 +3,4 @@ __dependencies.txt
 __pycache__/
 py-impl/test.py
 .venv/
+.vscode/
