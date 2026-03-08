@@ -1,5 +1,5 @@
 from . import x11api as api
-from .classes.models import CBItem, Representation
+from .classes.models import CBItem, Representation, Alias
 from . import config 
 
 from typing import Generator
@@ -23,6 +23,7 @@ def _build_snapshot_types(priority:list[str],targets:list[str]) -> Generator[tup
     count_p = len(priority)
     #
     dupe = set()
+    aliases = {}
     for i,target in enumerate(priority+targets):
         if target in dupe: continue
         else: dupe.add(target)
@@ -32,10 +33,17 @@ def _build_snapshot_types(priority:list[str],targets:list[str]) -> Generator[tup
             return BuilderState.FAIL_TIMEOUT # clipboard changed, stop
         
         diff = tick()
-        rep = api.fetch_data(target)
+        if target.lower() in aliases: rep = Alias(target, aliases[target.lower()])
+        else: rep = api.fetch_data(target)
+        #
         if rep is None:
             yield (BuilderState.FAIL_LOADPRIMARY if i < count_p else BuilderState.FAIL_LOADREGULAR), target, ""
         else:
+            t = rep.mime_type.lower()
+            if not isinstance(rep, Alias) and t in config.MIME_ALIASES:
+                for j in config.MIME_ALIASES[t]:
+                    aliases[j] = rep
+            #
             yield rep, i+1 < count_p, target # False when all priorities are done
     return BuilderState.SUCCESS
 
@@ -81,7 +89,7 @@ def builder(assert_all_types=False) -> Generator[any, list[str], any]:
                 snapshot.hash = _hash(rep.data)                 # try to initialize snapshot quickly (will work after only fetching 1 type)
             
             snapshot.types.append(rep)
-            snapshot.total_size += rep.size
+            snapshot.total_size += rep.size if not isinstance(rep, Alias) else 0
 
             blame["TYPES"][added_target] = tick() - diff
             yield snapshot, not next_is_primary, added_target                     # allow early stopping for any reason

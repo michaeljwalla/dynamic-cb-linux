@@ -3,7 +3,7 @@ from pathlib import Path
 import re
 
 from src import config
-from src.classes.models import CBItem, Representation
+from src.classes.models import CBItem, Representation, Alias
 from src.classes.clipboard import Clipboard
 
 rwpath: Path = Path.home() / config.CACHE_DIRECTORY / "blobs"
@@ -57,6 +57,8 @@ def offload(item: CBItem, types:list[str]=None, overwrite=False) -> dict[str, bo
     attempt_writes: list[Representation] = []
     for r in item.types:
         if (r.mime_type not in success): continue
+        if isinstance(r, Alias): continue
+
         attempt_writes.append(r)
     
     for r in attempt_writes:
@@ -97,6 +99,7 @@ def load(item: CBItem, types:list[str]=None) -> dict[str, bool]:
     attempt_reads: list[Representation] = []
     for r in item.types:
         if (r.mime_type not in success): continue
+        if isinstance(r, Alias): continue
         attempt_reads.append(r)
     
     for r in attempt_reads:
@@ -152,7 +155,7 @@ def _clear_by_hash(hash: str)->bool:
 
     toRemove:list[Path] = []
     for f in dir.iterdir():
-        if not ((f.name[-4:].lower() == ".bin") and f.is_file()):
+        if not (f.name == "preview.jpg" or (f.name[-4:].lower() == ".bin") and f.is_file()):
             return False #a foreign object exists
         toRemove.append(f)
     #
