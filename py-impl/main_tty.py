@@ -9,6 +9,7 @@ import src.config as config
 import src.builder as clipwatch
 from src import tty
 from src.processes import watcher, server
+import src.preview as preview
 
 from time import perf_counter_ns as tick
 
@@ -79,12 +80,26 @@ def menu_loading(c: Clipboard):
         else: diskload.offload( choice )
     
 
-menu_options = [menu_select, menu_pinning, menu_loading, lambda x: None, None]
+def menu_preview(c: Clipboard):
+    print()
+    pinned, unpinned = c.data
+    all_items = list(pinned) + list(unpinned)
+    for item in all_items:
+        result, is_path = preview.generate(item.data)
+        if is_path:
+            print(f"Image preview: {result}")
+        else:
+            truncated = result[:100] + "..." if len(result) > 100 else result
+            print(f"Text preview: {truncated}")
+    tty.msgwait("Press any key to continue")
+
+
+menu_options = [menu_select, menu_pinning, menu_loading, menu_preview, lambda x: None, None]
 
 #main loop
 while True:
     print("\n" + tty.output_clipboard(x))
-    options = ["Select", "Pin/Unpin", "Load/Unload", "Reload", "Exit"]
+    options = ["Select", "Pin/Unpin", "Load/Unload", "Preview", "Reload", "Exit"]
     action_choice = print() or menu_options[ tty.get_menus(options) - 1 ]
 
     if not action_choice:
