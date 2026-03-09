@@ -893,6 +893,7 @@ errpopup = TkPopup("Clipboard is full of pinned items, which do not auto-remove.
 errpopup.withdraw()  # hidden until needed
 
 ui_clipboard = UI_ClipboardWidget(root)
+root.withdraw()
 
 items:CBItem = offloader.generate_persistent()
 for i in sorted(items, key=lambda x: x.timestamp):
@@ -914,6 +915,14 @@ watcher.start(clipboard, alerting)
 offloader.start(clipboard, offloading)
 ipc.start(root, ui_clipboard)
 
+if not (offloader.rwpath / "tutorial").exists():
+    TkPopup("You can change these settings in src/config.py", "Got it")
+    TkPopup("Memory is automatically freed (saved to disk), with a default of 100 MB space before offloading.", "Thanks")
+    TkPopup("Pin items to save them on-reboot!", "Alright")
+    TkPopup("This tutorial only shows once...", "Continue")
+    (offloader.rwpath / "tutorial").touch(exist_ok=True)
+#
+TkPopup("Dynamic Clipboard has started successfully. Activate with 'dynamic-clipboard-toggle' or assign to a keybind!", "Cool")
 
 root.mainloop()
 

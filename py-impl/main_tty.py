@@ -1,7 +1,6 @@
 if __name__ != "__main__": exit()
 
 from src.processes import offload as diskload
-import src.db as db
 from src.classes.models import *
 from src.classes.clipboard import Clipboard
 import src.config as config
