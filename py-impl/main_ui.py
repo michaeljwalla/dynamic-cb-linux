@@ -4,6 +4,7 @@ import os
 import re
 import subprocess
 import tkinter as tk
+from tkinter import filedialog
 from PIL import Image, ImageTk
 import src.preview as preview
 from src.classes.clipboard import Clipboard
@@ -117,11 +118,67 @@ def _popup_monitor(win) -> tuple[int, int, int, int]:
     return 0, 0, win.winfo_screenwidth(), win.winfo_screenheight()
 
 
+def _native_save_dialog(default_name: str, mime_type: str) -> str | None:
+    """
+    Try zenity (GTK/GNOME) then kdialog (KDE) for a native save dialog.
+    Falls back to tkinter filedialog if neither is available.
+    Returns the chosen path string, or None if cancelled.
+    """
+    ext = mime_type.split("/")[-1]
+    filename = f"{default_name}.{ext}"
+    # zenity (GNOME / GTK)
+    try:
+        result = subprocess.run(
+            ["zenity", "--file-selection", "--save", "--confirm-overwrite",
+             f"--filename={filename}", f"--file-filter={mime_type} | *.{ext}"],
+            capture_output=True, text=True,
+        )
+        if result.returncode == 0:
+            return result.stdout.strip() or None
+        return None  # user cancelled
+    except FileNotFoundError:
+        pass
+    # kdialog (KDE)
+    try:
+        result = subprocess.run(
+            ["kdialog", "--getsavefilename", filename, f"*.{ext}"],
+            capture_output=True, text=True,
+        )
+        if result.returncode == 0:
+            return result.stdout.strip() or None
+        return None
+    except FileNotFoundError:
+        pass
+    # fallback
+    return filedialog.asksaveasfilename(
+        defaultextension=f".{ext}",
+        filetypes=[(mime_type, f"*.{ext}"), ("All files", "*.*")],
+    ) or None
+
+
+def _bind_drag(window):
+    """Make window draggable by clicking anywhere except buttons."""
+    def start(e):
+        if isinstance(e.widget, tk.Button): return
+        window._drag_x = e.x_root
+        window._drag_y = e.y_root
+    def drag(e):
+        if not hasattr(window, '_drag_x'): return
+        dx = e.x_root - window._drag_x
+        dy = e.y_root - window._drag_y
+        window._drag_x = e.x_root
+        window._drag_y = e.y_root
+        window.geometry(f"+{window.winfo_x() + dx}+{window.winfo_y() + dy}")
+    window.bind("<ButtonPress-1>", start, add=True)
+    window.bind("<B1-Motion>",     drag,  add=True)
+
+
 class TkPopup(tk.Toplevel):
     """Non-blocking popup with a message and an OK button."""
 
     def __init__(self, message: str, button_label: str = "Ok"):
-        super().__init__(bg=COLOR_ITEM)
+        super().__init__(bg=COLOR_ITEM,
+                         highlightbackground=COLOR_ACCENT, highlightthickness=2)
         self.withdraw()  # hide while building to prevent black-screen flash
 
         self.overrideredirect(True)
@@ -162,8 +219,119 @@ class TkPopup(tk.Toplevel):
         x = mx + (mw - W) // 2
         y = my + (mh - H) // 2
         self.geometry(f"{W}x{H}+{x}+{y}")
+        _bind_drag(self)
         self.deiconify()
         self.update()
+
+
+class TkSavePopup(tk.Toplevel):
+    """Non-blocking save-as popup listing all Representations of a CBItem."""
+
+    _MAX_H = 320
+
+    def __init__(self, cbitem):
+        super().__init__(bg=COLOR_BG,
+                         highlightbackground=COLOR_ACCENT, highlightthickness=2)
+        self.withdraw()
+
+        self.overrideredirect(True)
+        self.attributes("-topmost", True)
+        self.wm_attributes("-type", "splash")
+        self.resizable(False, False)
+
+        self._debounced = False
+
+        # Load all representations into memory before building buttons
+        offloader.load(cbitem)
+
+        tk.Label(
+            self,
+            text="Save as…",
+            bg=COLOR_BG,
+            fg=COLOR_TEXT,
+            font=("Helvetica", 10, "bold"),
+        ).pack(padx=12, pady=(10, 4))
+
+        # Scrollable button list
+        container = tk.Frame(self, bg=COLOR_BG)
+        container.pack(fill=tk.BOTH, expand=True, padx=10, pady=(0, 10))
+
+        scrollbar = tk.Scrollbar(container, orient=tk.VERTICAL)
+        canvas = tk.Canvas(
+            container, bg=COLOR_BG, highlightthickness=0,
+            yscrollcommand=scrollbar.set,
+        )
+        scrollbar.configure(command=canvas.yview)
+        inner = tk.Frame(canvas, bg=COLOR_BG)
+        inner.bind(
+            "<Configure>",
+            lambda _e: canvas.configure(scrollregion=canvas.bbox("all")),
+        )
+        canvas.create_window((0, 0), window=inner, anchor="nw")
+
+        for rep in cbitem.types:
+            mime = rep.mime_type
+            ext  = mime.split("/")[-1]
+            tk.Button(
+                inner,
+                text=mime,
+                anchor="w",
+                bg=COLOR_ITEM,
+                fg=COLOR_TEXT,
+                activebackground=COLOR_HOVER,
+                activeforeground=COLOR_TEXT,
+                relief="flat",
+                font=("Helvetica", 9),
+                command=lambda r=rep, e=ext: self._save(r, e),
+            ).pack(fill=tk.X, padx=4, pady=2)
+
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+
+        cancel_btn = tk.Button(
+            self,
+            text="Cancel",
+            command=self.destroy,
+            bg=COLOR_ITEM,
+            fg=COLOR_TEXT,
+            activebackground=COLOR_HOVER,
+            activeforeground=COLOR_TEXT,
+            relief="flat",
+            font=("Helvetica", 9),
+        )
+        cancel_btn.pack(fill=tk.X, padx=10, pady=(0, 8))
+
+        # Derive width from the widest button, cap height
+        self.update_idletasks()
+        inner_w = inner.winfo_reqwidth()
+        sb_w    = scrollbar.winfo_reqwidth()
+        PAD     = 20 + 8  # container padx*2 + inner button padx*2
+        W = max(inner_w + sb_w + PAD, 200)
+        inner_h = inner.winfo_reqheight()
+        CHROME  = 50 + cancel_btn.winfo_reqheight() + 8  # title + cancel + padding
+        H = min(inner_h + CHROME, self._MAX_H)
+        canvas.configure(width=inner_w + sb_w, height=H - CHROME)
+
+        mx, my, mw, mh = _popup_monitor(self.master)
+        x = mx + (mw - W) // 2
+        y = my + (mh - H) // 2
+        self.geometry(f"{W}x{H}+{x}+{y}")
+        _bind_drag(self)
+        self.deiconify()
+        self.update()
+        self.focus_set()
+
+    def _save(self, rep, ext):
+        if self._debounced:
+            return
+        self._debounced = True
+
+        path = _native_save_dialog("untitled", rep.mime_type)
+        if path:
+            with open(path, "wb") as f:
+                f.write(rep.data)
+        self.destroy()
+
 
 class UI_OptionsMenu(tk.Toplevel):
     """Context menu for options button with Pin/Unpin, Save, Delete."""
@@ -202,9 +370,8 @@ class UI_OptionsMenu(tk.Toplevel):
         self.destroy()
     
     def _on_save(self):
-        # TODO: Implement save functionality
-        print("Save not implemented")
         self.destroy()
+        TkSavePopup(self.cbitem)
     
     def _on_delete(self):
         # Remove from UI

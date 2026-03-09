@@ -13,7 +13,7 @@ CLIPBOARD = d.intern_atom('CLIPBOARD')
 TARGETS = d.intern_atom('TARGETS')
 TIMESTAMP = d.intern_atom('TIMESTAMP')
 
-timestamp = None
+timestamp = -1
 
 #just check if 
 def check() -> bool: #bool
@@ -22,7 +22,7 @@ def check() -> bool: #bool
     timestamp = get_timestamp()
     return last != timestamp
 
-def get_timestamp() -> int | None:
+def get_timestamp() -> int:
     window.convert_selection(CLIPBOARD, TIMESTAMP, TIMESTAMP, X.CurrentTime)
     d.flush()
 
@@ -32,10 +32,11 @@ def get_timestamp() -> int | None:
             break
 
     if event.property == X.NONE:
-        return None
+        return 0
 
     prop = window.get_full_property(TIMESTAMP, X.AnyPropertyType)
-    return prop.value[0] if prop else None
+    return prop.value[0] if prop else 0
+timestamp = get_timestamp() - 1 #initialize timestamp at startup
 
 def get_targets() -> list[str]:
     window.convert_selection(CLIPBOARD, TARGETS, TARGETS, X.CurrentTime)
