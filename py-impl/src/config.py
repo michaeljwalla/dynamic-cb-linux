@@ -1,3 +1,5 @@
+from pathlib import Path
+
 DEBUG = False
 
 
@@ -6,7 +8,7 @@ MEM_DUMP_THRESHOLD_MB = MEM_THRESHOLD_MB * 1/3
 MAX_ITEMS = 50
 MEM_OFFLOAD_THRESHOLD_MB = MEM_DUMP_THRESHOLD_MB / MAX_ITEMS / 2 #once offload is triggered, things over this size go away
 
-CACHE_DIRECTORY = ".cb_history" # in home dir
+CACHE_DIRECTORY = str(Path.home() / ".cb_history")
 
 PREVIEW = {
     "MAX_STRLEN": 25,       # truncate (...) after 25 chars

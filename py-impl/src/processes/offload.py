@@ -9,7 +9,7 @@ from src.classes.clipboard import Clipboard
 
 import json
 
-rwpath: Path = Path(__file__).resolve().parent.parent.parent / config.CACHE_DIRECTORY / "blobs"
+rwpath: Path = Path(config.CACHE_DIRECTORY) / "blobs"
 rwpath.mkdir(parents=True, exist_ok=True)
 
 _watcher_thread: threading.Thread | None = None

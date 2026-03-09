@@ -23,10 +23,6 @@ echo "Installing launcher to $BIN_DIR/dynamic-clipboard(-toggle)..."
 #hardcoded path
 sudo tee $BIN_DIR/dynamic-clipboard > /dev/null << 'EOF'
 #!/bin/bash
-if systemctl --user is-active --quiet dynamic-clipboard; then
-    echo "dynamic-clipboard is already running. if you want to toggle, use dynamic-clipboard-toggle"
-    exit 0
-fi
 exec /usr/local/lib/dynamic-clipboard/.venv/bin/python3 \
      /usr/local/lib/dynamic-clipboard/main_ui.py "$@"
 EOF
@@ -35,6 +31,7 @@ sudo chmod +x $BIN_DIR/dynamic-clipboard
 #hardcoded path
 sudo tee /usr/local/bin/dynamic-clipboard-toggle > /dev/null << 'EOF'
 #!/bin/bash
+echo "you should set /usr/local/bin/dynamic-clipboard-toggle to a hotkey!"
 echo "show" | /usr/bin/socat - UNIX-CONNECT:/tmp/dynamic-cb.sock
 EOF
 sudo chmod +x /usr/local/bin/dynamic-clipboard-toggle
@@ -51,6 +48,7 @@ Wants=graphical-session.target
 [Service]
 Type=simple
 ExecStart=/usr/local/bin/dynamic-clipboard
+WorkingDirectory=/usr/local/bin
 Restart=on-failure
 RestartSec=3
 
@@ -68,7 +66,7 @@ sudo chown -R $USER:$USER /usr/local/lib/dynamic-clipboard
 systemctl --user daemon-reload
 systemctl --user enable dynamic-clipboard.service
 
-systemctl --user restart dynamic-clipboard.service
+# systemctl --user restart dynamic-clipboard.service
 
 echo -e "\ndone.\n\n"
 echo ========================================================

@@ -17,7 +17,7 @@ def generate(item: CBItem) -> tuple[str, bool]:
                 continue
 
     # Preferred image types in order
-    preferred_images = ['image/jpeg', 'image/jpg', 'image/png', 'image/tiff', 'image/bmp']
+    preferred_images = ['image/jpeg', 'image/jpg', "audio/x-riff", 'image/png', 'image/tiff', 'image/bmp']
     
     # Find the best image representation
     image_rep = None
