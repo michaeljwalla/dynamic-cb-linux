@@ -1,6 +1,30 @@
 #!/bin/bash
 
+
 set -e
+# SYSTEM packages check (not venv)
+missing=()
+for pkg in python3-tk socat; do
+    if ! dpkg -s "$pkg" >/dev/null 2>&1; then
+        missing+=("$pkg")
+    fi
+done
+
+if [ ${#missing[@]} -ne 0 ]; then
+    echo "Missing required system packages: ${missing[*]}"
+    read -rp "Install now? (y/n): " choice
+
+    if [[ "$choice" =~ ^[Yy]$ ]]; then
+        sudo apt update
+        sudo apt install -y python3-tk socat
+    else
+        echo "Installation cancelled. Please run:"
+        echo "sudo apt install python3-tk socat"
+        exit 1
+    fi
+fi
+
+###
 
 APP_DIR="/usr/local/lib/dynamic-clipboard"
 BIN_DIR="/usr/local/bin"
@@ -26,9 +50,9 @@ sudo tee $BIN_DIR/dynamic-clipboard > /dev/null << 'EOF'
 exec /usr/local/lib/dynamic-clipboard/.venv/bin/python3 \
      /usr/local/lib/dynamic-clipboard/main_ui.py "$@"
 EOF
-sudo chmod +x $BIN_DIR/dynamic-clipboard
+sudo chmod +x $BIN_DIR/dynamic-clipboard 
 
-#hardcoded path
+#hardcoded path 
 sudo tee /usr/local/bin/dynamic-clipboard-toggle > /dev/null << 'EOF'
 #!/bin/bash
 echo "you should set /usr/local/bin/dynamic-clipboard-toggle to a hotkey!"
