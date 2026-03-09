@@ -883,7 +883,6 @@ class UI_ClipboardWidget(tk.Frame):
             item.pack(fill=tk.X, padx=8, pady=4)
 
 
-# ── demo ──────────────────────────────────────────────────────────────────────
 root = tk.Tk()
 root.configure(bg=COLOR_BG,
                highlightbackground=COLOR_TEXT, highlightcolor=COLOR_TEXT, highlightthickness=1)
