@@ -1,6 +1,8 @@
 from ast import Pass
 from calendar import c
 import os
+import re
+import subprocess
 import tkinter as tk
 from PIL import Image, ImageTk
 import src.preview as preview
@@ -28,14 +30,16 @@ clipboard = Clipboard()
 item_dict:dict[str, "UI_ClipboardItem"] = {}  # hash -> UI_ClipboardItem
 ui_clipboard = None  # Will be set in demo
 
+errpopup:"TkPopup" = None
 def alerting(cbitem, state, value):
     global ui_clipboard
     if not state:
         if value: return #alr exists
         else:
+            errpopup.deiconify()
+            errpopup.focus_set()
             #ui_clipboard.remove( item_dict[cbitem.hash] ) # too many pinned. remove from UI but not clipboard (since it is pinned, it won't be auto-removed)
             return
-            #make tk popup with "Ok" button only saying "Clipboard is full of pinned items, only unpinned items can be auto-removed." 
     
     hash = cbitem.hash
     if hash not in item_dict:
@@ -92,6 +96,74 @@ def _load_icon(filename: str, size: int, opacity: float = 1.0) -> ImageTk.PhotoI
     white = Image.new("L", img.size, 255)
     return ImageTk.PhotoImage(Image.merge("RGBA", (white, white, white, a)))
 
+
+def _popup_monitor(win) -> tuple[int, int, int, int]:
+    """Return (x, y, w, h) of the monitor containing the centre of win."""
+    win.update_idletasks()
+    cx = win.winfo_rootx() + win.winfo_width() // 2
+    cy = win.winfo_rooty() + win.winfo_height() // 2
+    try:
+        for line in subprocess.check_output(["xrandr"], text=True).splitlines():
+            if " connected" not in line:
+                continue
+            m = re.search(r"(\d+)x(\d+)\+(\d+)\+(\d+)", line)
+            if not m:
+                continue
+            mw, mh, mx, my = map(int, m.groups())
+            if mx <= cx < mx + mw and my <= cy < my + mh:
+                return mx, my, mw, mh
+    except Exception:
+        pass
+    return 0, 0, win.winfo_screenwidth(), win.winfo_screenheight()
+
+
+class TkPopup(tk.Toplevel):
+    """Non-blocking popup with a message and an OK button."""
+
+    def __init__(self, message: str, button_label: str = "Ok"):
+        super().__init__(bg=COLOR_ITEM)
+        self.withdraw()  # hide while building to prevent black-screen flash
+
+        self.overrideredirect(True)
+        self.attributes("-topmost", True)
+        self.wm_attributes("-type", "splash")  # suppress taskbar entry on X11
+        self.resizable(False, False)
+
+        # Outer frame with slight inset so the bg border is visible but tight
+        inner = tk.Frame(self, bg=COLOR_ITEM, padx=14, pady=10)
+        inner.pack(fill=tk.BOTH, expand=True)
+
+        tk.Label(
+            inner,
+            text=message,
+            bg=COLOR_ITEM,
+            fg=COLOR_TEXT,
+            wraplength=300,
+            justify="center",
+            font=("Helvetica", 10),
+        ).pack(pady=(8, 8))
+
+        tk.Button(
+            inner,
+            text=button_label,
+            command=self.withdraw,
+            bg=COLOR_ACCENT,
+            fg=COLOR_TEXT,
+            relief="flat",
+            font=("Helvetica", 10),
+            padx=16,
+            pady=4,
+        ).pack(pady=(0, 6))
+
+        # Auto-size, then center on the monitor containing the root window
+        self.update_idletasks()
+        W, H = self.winfo_reqwidth(), self.winfo_reqheight()
+        mx, my, mw, mh = _popup_monitor(self.master)
+        x = mx + (mw - W) // 2
+        y = my + (mh - H) // 2
+        self.geometry(f"{W}x{H}+{x}+{y}")
+        self.deiconify()
+        self.update()
 
 class UI_OptionsMenu(tk.Toplevel):
     """Context menu for options button with Pin/Unpin, Save, Delete."""
@@ -601,6 +673,9 @@ class UI_ClipboardWidget(tk.Frame):
 # ── demo ──────────────────────────────────────────────────────────────────────
 root = tk.Tk()
 root.configure(bg=COLOR_BG)
+
+errpopup = TkPopup("Clipboard is full of pinned items, which do not auto-remove. Please unpin stuff.", "Ok")
+errpopup.withdraw()  # hidden until needed
 
 ui_clipboard = UI_ClipboardWidget(root)
 
