@@ -16,6 +16,7 @@ import src.processes.ipc as ipc
 import src.x11api as api
 from src import config
 from src import ui_themes
+import time
 
 ASSETS_DIR = os.path.join(os.path.dirname(__file__), "ui")
 
@@ -915,6 +916,7 @@ watcher.start(clipboard, alerting)
 offloader.start(clipboard, offloading)
 ipc.start(root, ui_clipboard)
 
+time.sleep(5)
 if not (offloader.rwpath / "tutorial").exists():
     TkPopup("You can change these settings in src/config.py", "Got it")
     TkPopup("Memory is automatically freed (saved to disk), with a default of 100 MB space before offloading.", "Thanks")
