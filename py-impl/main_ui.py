@@ -28,10 +28,24 @@ clipboard = Clipboard()
 item_dict:dict[str, "UI_ClipboardItem"] = {}  # hash -> UI_ClipboardItem
 ui_clipboard = None  # Will be set in demo
 
-def alerting(cbitem):
+def alerting(cbitem, state, value):
     global ui_clipboard
+    if not state:
+        if value: return #alr exists
+        else:
+            #ui_clipboard.remove( item_dict[cbitem.hash] ) # too many pinned. remove from UI but not clipboard (since it is pinned, it won't be auto-removed)
+            return
+            #make tk popup with "Ok" button only saying "Clipboard is full of pinned items, only unpinned items can be auto-removed." 
+    
     hash = cbitem.hash
     if hash not in item_dict:
+        if value and value.hash in item_dict:
+            ui_clipboard.remove( item_dict[value.hash] ) #this pops the last unpinned value
+            # Remove from clipboard
+            offloader.cleanup_remnants(clipboard, clear_unpinned=False)
+
+            ui_clipboard._update_no_history()
+            ui_clipboard._update_status()
         # First call: add in loading state
         item = ui_clipboard.add(cbitem)
         item_dict[hash] = item
@@ -592,9 +606,14 @@ ui_clipboard = UI_ClipboardWidget(root)
 
 items:CBItem = offloader.generate_persistent()
 for i in sorted(items, key=lambda x: x.timestamp):
-    ui_item = ui_clipboard.add(i)
     i.pinned = False # so we can use the ui toggle
-    clipboard.append(i)
+    success, value = clipboard.append(i)
+    if not success:
+        if value: pass #alr exist
+        else: break # too many pinned. better to just not delete in case...
+    #
+    ui_item = ui_clipboard.add(i)
+    item_dict[i.hash] = ui_item
     ui_clipboard.add(i, ui_item)
     ui_item._on_pin_click()
 #

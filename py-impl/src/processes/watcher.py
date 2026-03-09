@@ -72,16 +72,17 @@ def _poll_loop(clipboard: Clipboard, stop: threading.Event, alerting=None):
 
                         # First type fetched — item is identifiable; put it in the clipboard
                         # while it is still in Processing state (_ready cleared).
-                        clipboard.append(snapshot)
+                        state, value = clipboard.append(snapshot)
                         appended = True
 
                         # Alert loading state
                         if alerting:
-                            alerting(snapshot)
+                            alerting(snapshot, state, value)
 
                         # Release the clipboard lock so observers can see the new slot.
                         # The item itself remains Processing until all types are fetched.
                         clipboard._ready.set()
+                        if not state: break #item exists or too much pinned, no point continuing
 
             except StopIteration:
                 pass  # BuilderState; data is whatever was accumulated
@@ -104,4 +105,4 @@ def _poll_loop(clipboard: Clipboard, stop: threading.Event, alerting=None):
                 snapshot._ready.set()
                 # Alert finished state
                 if alerting:
-                    alerting(snapshot)
+                    alerting(snapshot, state, "(nothing)")
