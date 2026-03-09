@@ -12,6 +12,7 @@ from src.classes.models import CBItem, _format_bytes
 import src.processes.watcher as watcher
 import src.processes.server as server
 import src.processes.offload as offloader
+import src.processes.ipc as ipc
 import src.x11api as api
 from src import config
 from src import ui_themes
@@ -256,7 +257,10 @@ class TkSavePopup(tk.Toplevel):
         container = tk.Frame(self, bg=COLOR_BG)
         container.pack(fill=tk.BOTH, expand=True, padx=10, pady=(0, 10))
 
-        scrollbar = tk.Scrollbar(container, orient=tk.VERTICAL)
+        scrollbar = tk.Scrollbar(container, orient=tk.VERTICAL,
+                                 bg=COLOR_ITEM, troughcolor=COLOR_BG,
+                                 activebackground=COLOR_ACCENT,
+                                 highlightthickness=0, borderwidth=0)
         canvas = tk.Canvas(
             container, bg=COLOR_BG, highlightthickness=0,
             yscrollcommand=scrollbar.set,
@@ -326,6 +330,7 @@ class TkSavePopup(tk.Toplevel):
             return
         self._debounced = True
 
+        self.withdraw()
         path = _native_save_dialog("untitled", rep.mime_type)
         if path:
             with open(path, "wb") as f:
@@ -337,33 +342,61 @@ class UI_OptionsMenu(tk.Toplevel):
     """Context menu for options button with Pin/Unpin, Save, Delete."""
     
     def __init__(self, parent: tk.Frame, cbitem, item: "UI_ClipboardItem"):
-        super().__init__(parent, bg=COLOR_ITEM, relief="raised", borderwidth=1)
+        super().__init__(parent, bg=COLOR_BG,
+                         highlightbackground=COLOR_ACCENT, highlightthickness=1)
         self.cbitem = cbitem
         self.item = item
-        
-        # Remove window decorations
+
+        self.withdraw()
         self.overrideredirect(True)
         self.attributes("-topmost", True)
-        
+        self.wm_attributes("-type", "splash")
+
+        def _btn(text, cmd):
+            return tk.Button(
+                self, text=text, command=cmd,
+                bg=COLOR_BG, fg=COLOR_TEXT,
+                activebackground=COLOR_HOVER, activeforeground=COLOR_TEXT,
+                relief="flat", anchor="w",
+                font=("Helvetica", 9),
+                padx=12, pady=5,
+                borderwidth=0, highlightthickness=0,
+                cursor="hand2",
+            )
+
         pin_text = "Unpin" if cbitem.pinned else "Pin"
-        self.pin_btn = tk.Button(self, text=pin_text, command=self._on_pin, bg=COLOR_ITEM, fg=COLOR_TEXT, relief="flat")
-        self.save_btn = tk.Button(self, text="Save", command=self._on_save, bg=COLOR_ITEM, fg=COLOR_TEXT, relief="flat")
-        self.delete_btn = tk.Button(self, text="Delete", command=self._on_delete, bg=COLOR_ITEM, fg=COLOR_TEXT, relief="flat")
-        
-        self.pin_btn.pack(fill=tk.X, padx=5, pady=2)
-        self.save_btn.pack(fill=tk.X, padx=5, pady=2)
-        self.delete_btn.pack(fill=tk.X, padx=5, pady=2)
-        
+        self.pin_btn    = _btn(pin_text,  self._on_pin)
+        self.save_btn   = _btn("Save",    self._on_save)
+        self.delete_btn = _btn("Delete",  self._on_delete)
+
+        self.pin_btn.pack(fill=tk.X)
+        tk.Frame(self, bg=COLOR_ACCENT, height=1, highlightbackground=COLOR_TEXT,).pack(fill=tk.X)
+        self.save_btn.pack(fill=tk.X)
+        tk.Frame(self, bg=COLOR_ACCENT, height=1, highlightbackground=COLOR_TEXT).pack(fill=tk.X)
+        self.delete_btn.configure(fg=COLOR_PIN)
+        self.delete_btn.pack(fill=tk.X)
+
         # Position relative to the options button
         options_btn = item.options
-        # Get absolute position
         x = options_btn.winfo_rootx() + options_btn.winfo_width() + 5
         y = options_btn.winfo_rooty()
         self.geometry(f"+{x}+{y}")
-        
-        # Bind to destroy on focus out
-        self.bind("<FocusOut>", lambda e: self.destroy())
+
+        self.protocol("WM_DELETE_WINDOW", self.destroy)
+        self.bind("<Destroy>", lambda e: setattr(item, "_options_menu", None) if e.widget is self else None)
+
+        self.deiconify()
+        self.update_idletasks()
+        self.grab_set()
         self.focus_set()
+
+        def _on_click(e):
+            wx, wy = self.winfo_rootx(), self.winfo_rooty()
+            ww, wh = self.winfo_width(), self.winfo_height()
+            if not (wx <= e.x_root < wx + ww and wy <= e.y_root < wy + wh):
+                self.destroy()
+
+        self.bind("<ButtonPress-1>", _on_click, add=True)
     
     def _on_pin(self):
         self.item._on_pin_click()
@@ -526,6 +559,7 @@ class UI_ClipboardItem(tk.Frame):
         self.pin.sync_bg(color)
         if self._preview:
             self._preview.configure(bg=color)
+        self._update_accent()
 
     def _on_pin_click(self):
         """Toggle pin state: pin moves to top (full opacity), unpin moves to bottom (25% opacity)."""
@@ -568,12 +602,19 @@ class UI_ClipboardItem(tk.Frame):
             else:
                 # Reset or ignore
                 pass
+            root.withdraw()
         # If not ready, ignore
 
     def _on_options_click(self):
-        """Open the options menu."""
-        if self.cbitem:
-            UI_OptionsMenu(self, self.cbitem, self)
+        """Toggle the options menu."""
+        if not self.cbitem:
+            return
+        menu = getattr(self, "_options_menu", None)
+        if menu and menu.winfo_exists():
+            menu.destroy()
+            self._options_menu = None
+            return
+        self._options_menu = UI_OptionsMenu(self, self.cbitem, self)
 
     def update_with_cbitem(self, cbitem):
         self.cbitem = cbitem
@@ -639,6 +680,7 @@ class UI_ClipboardWidget(tk.Frame):
         super().__init__(root, bg=COLOR_BG, width=w, height=h)
         self.items: list[UI_ClipboardItem] = []
         self.selected_item: UI_ClipboardItem | None = None  # Track currently selected item
+
         self.pack_propagate(False)
         self.pack()
 
@@ -648,7 +690,8 @@ class UI_ClipboardWidget(tk.Frame):
         self.header_frame.pack_propagate(True)
 
         # Status frame at bottom
-        self.status_frame = tk.Frame(self, bg=COLOR_STATUS, height=20)
+        self.status_frame = tk.Frame(self, bg=COLOR_STATUS, height=20,
+                                     highlightbackground=COLOR_TEXT, highlightthickness=1)
         self.status_frame.pack(side=tk.BOTTOM, fill=tk.X)
         self.status_frame.pack_propagate(False)
 
@@ -673,7 +716,10 @@ class UI_ClipboardWidget(tk.Frame):
         self.status_right.pack(side=tk.RIGHT, padx=5)
 
         # Scrollbar
-        self._scrollbar = tk.Scrollbar(self, orient=tk.VERTICAL)
+        self._scrollbar = tk.Scrollbar(self, orient=tk.VERTICAL,
+                                       bg=COLOR_ITEM, troughcolor=COLOR_BG,
+                                       activebackground=COLOR_ACCENT,
+                                       highlightthickness=0, borderwidth=0)
         self._scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
 
         # Canvas for scrolling
@@ -839,7 +885,10 @@ class UI_ClipboardWidget(tk.Frame):
 
 # ── demo ──────────────────────────────────────────────────────────────────────
 root = tk.Tk()
-root.configure(bg=COLOR_BG)
+root.configure(bg=COLOR_BG,
+               highlightbackground=COLOR_TEXT, highlightcolor=COLOR_TEXT, highlightthickness=1)
+root.wm_attributes("-type", "splash")
+root.attributes("-topmost", True)
 
 errpopup = TkPopup("Clipboard is full of pinned items, which do not auto-remove. Please unpin stuff.", "Ok")
 errpopup.withdraw()  # hidden until needed
@@ -864,5 +913,8 @@ offloader.cleanup_remnants(clipboard, clear_unpinned=False)
 # Start watcher with alerting
 watcher.start(clipboard, alerting)
 offloader.start(clipboard, offloading)
+ipc.start(root, ui_clipboard)
+
+
 root.mainloop()
 
