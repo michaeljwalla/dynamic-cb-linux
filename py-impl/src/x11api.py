@@ -55,7 +55,7 @@ def get_targets() -> list[str]:
         return []
 
     names = [d.get_atom_name(a) for a in prop.value]
-    return [n for n in names if '/' in n]
+    return [n for n in names if '/' in n or n in config.LEGACY_TEXT_TYPES]
 
 # Call once at startup, not inside fetch_data
 window.change_attributes(event_mask=X.PropertyChangeMask)

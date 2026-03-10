@@ -20,6 +20,14 @@ def _generate_aliases(l: list[str])->dict[str, list[str]]:
     return dict(zip(l, [l for _ in l]))
 # compilation of all aliases currently found
 
+
+LEGACY_TEXT_TYPES = {
+    "UTF8_STRING",
+    "TEXT",
+    "STRING",
+    "COMPOUND_TEXT",
+    #"text/plain"
+}
 _aliases = {
     "icon":_generate_aliases([ "image/x-icon", "image/x-ico", "image/vnd.microsoft.icon", "application/ico", "image/ico", "image/icon", "text/ico" ]),
     "bmp":_generate_aliases(["image/bmp", "image/x-ms-bmp", "image/x-bmp", "image/x-win-bitmap"]),
