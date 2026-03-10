@@ -16,10 +16,10 @@ if [ ${#missing[@]} -ne 0 ]; then
 
     if [[ "$choice" =~ ^[Yy]$ ]]; then
         sudo apt update
-        sudo apt install -y python3-tk socat
+        sudo apt install -y python3-tk socat python3-venv
     else
         echo "Installation cancelled. Please run:"
-        echo "sudo apt install python3-tk socat"
+        echo "sudo apt install python3-tk socat python3-venv"
         exit 1
     fi
 fi
