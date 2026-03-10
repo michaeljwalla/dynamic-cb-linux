@@ -4,7 +4,7 @@
 set -e
 # SYSTEM packages check (not venv)
 missing=()
-for pkg in python3-tk socat; do
+for pkg in python3-tk socat python3-venv; do
     if ! dpkg -s "$pkg" >/dev/null 2>&1; then
         missing+=("$pkg")
     fi

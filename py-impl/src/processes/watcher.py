@@ -105,4 +105,4 @@ def _poll_loop(clipboard: Clipboard, stop: threading.Event, alerting=None):
                 snapshot._ready.set()
                 # Alert finished state
                 if alerting:
-                    alerting(snapshot, state, "(nothing)")
+                    alerting(snapshot, state, None)

@@ -111,7 +111,7 @@ def _popup_monitor(win) -> tuple[int, int, int, int]:
                 continue
             m = re.search(r"(\d+)x(\d+)\+(\d+)\+(\d+)", line)
             if not m:
-                continue
+                continue 
             mw, mh, mx, my = map(int, m.groups())
             if mx <= cx < mx + mw and my <= cy < my + mh:
                 return mx, my, mw, mh
@@ -275,6 +275,7 @@ class TkSavePopup(tk.Toplevel):
         canvas.create_window((0, 0), window=inner, anchor="nw")
 
         for rep in cbitem.types:
+            if rep.mime_type in config.LEGACY_TEXT_TYPES: continue
             mime = rep.mime_type
             ext  = mime.split("/")[-1]
             tk.Button(
@@ -912,11 +913,12 @@ for i in sorted(items, key=lambda x: x.timestamp):
 offloader.cleanup_remnants(clipboard, clear_unpinned=False)
 
 # Start watcher with alerting
+time.sleep(3)
+
 watcher.start(clipboard, alerting)
 offloader.start(clipboard, offloading)
 ipc.start(root, ui_clipboard)
 
-time.sleep(5)
 if not (offloader.rwpath / "tutorial").exists():
     TkPopup("You can change these settings in src/config.py", "Got it")
     TkPopup("Memory is automatically freed (saved to disk), with a default of 150 MB space before offloading.", "Thanks")
