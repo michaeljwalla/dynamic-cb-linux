@@ -9,18 +9,19 @@ for pkg in python3-tk socat python3-venv; do
         missing+=("$pkg")
     fi
 done
-
-if [ ${#missing[@]} -ne 0 ]; then
-    echo "Missing required system packages: ${missing[*]}"
-    read -rp "Install now? (y/n): " choice
-
-    if [[ "$choice" =~ ^[Yy]$ ]]; then
-        sudo apt update
-        sudo apt install -y python3-tk socat python3-venv
-    else
-        echo "Installation cancelled. Please run:"
-        echo "sudo apt install python3-tk socat python3-venv"
-        exit 1
+if [ "$1" != "skip" ] then
+    if [ ${#missing[@]} -ne 0 ]; then
+        echo "Missing required system packages: ${missing[*]}"
+        read -rp "Install now? (y/n): " choice
+    
+        if [[ "$choice" =~ ^[Yy]$ ]]; then
+            sudo apt update
+            sudo apt install -y python3-tk socat python3-venv
+        else
+            echo "Installation cancelled. Please run:"
+            echo "sudo apt install python3-tk socat python3-venv"
+            exit 1
+        fi
     fi
 fi
 
