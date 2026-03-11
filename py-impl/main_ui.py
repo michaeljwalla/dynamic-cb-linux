@@ -34,10 +34,10 @@ item_dict:dict[str, "UI_ClipboardItem"] = {}  # hash -> UI_ClipboardItem
 ui_clipboard = None  # Will be set in demo
 
 errpopup:"TkPopup" = None
-def alerting(cbitem, state, value):
+def alerting(cbitem, state, popped):
     global ui_clipboard
     if not state:
-        if value: return #alr exists
+        if popped: return #alr exists
         else:
             errpopup.deiconify()
             errpopup.focus_set()
@@ -46,8 +46,8 @@ def alerting(cbitem, state, value):
     
     hash = cbitem.hash
     if hash not in item_dict:
-        if value and value.hash in item_dict:
-            ui_clipboard.remove( item_dict[value.hash] ) #this pops the last unpinned value
+        if popped and popped.hash in item_dict:
+            ui_clipboard.remove( item_dict[popped.hash] ) #this pops the last unpinned value
             # Remove from clipboard
             offloader.cleanup_remnants(clipboard, clear_unpinned=False)
 
@@ -656,7 +656,7 @@ class UI_ClipboardItem(tk.Frame):
             lbl = tk.Label(
                 self,
                 text=display,
-                bg=self["bg"],
+                bg=UI_ClipboardItem._bg,
                 fg=COLOR_TEXT,
                 anchor="nw",
                 justify="left",
