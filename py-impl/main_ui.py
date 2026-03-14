@@ -631,6 +631,8 @@ class UI_ClipboardItem(tk.Frame):
         - is_path=False: shows text truncated to text_truncate chars, appending "..."
         The preview is left-justified and stops before the two buttons on the right.
         """
+        if not self.winfo_exists():  # or whatever your container widget is
+            return
         if self._preview:
             self._preview.destroy()
             self._preview = None
