@@ -808,7 +808,7 @@ class UI_ClipboardWidget(tk.Frame):
             # Check if this item should be selected (matches clipboard selection)
             # if cbitem and cbitem.hash == clipboard.selection.hash:
             #     self._set_selection(item)
-        else:
+        elif item.winfo_exists():
             item.update_with_cbitem(cbitem)
             # Update accent in case pin state changed
             item._update_accent()
