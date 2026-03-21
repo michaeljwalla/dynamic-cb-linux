@@ -12,14 +12,13 @@ done
 if [ "$1" != "skip" ]; then
     if [ ${#missing[@]} -ne 0 ]; then
         echo "Missing required system packages: ${missing[*]}"
-        read -rp "Install now? (y/n): " choice
+        read -rp "Force-install clipboard anyways? (Not recommended) (y/n): " choice
     
         if [[ "$choice" =~ ^[Yy]$ ]]; then
-            sudo apt update
-            sudo apt install -y python3-tk socat python3-venv
+            echo "Attempting to force install..."
         else
-            echo "Installation cancelled. Please run:"
-            echo "sudo apt install python3-tk socat python3-venv"
+            echo "Installation cancelled. Please install:"
+            echo ${missing[*]}
             exit 1
         fi
     fi
