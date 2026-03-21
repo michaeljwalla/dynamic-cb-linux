@@ -3,19 +3,10 @@ from PIL import Image
 import io
 from src.classes.models import CBItem, Representation
 from . import config
+from .processes import offload as diskload 
 
-
-def generate(item: CBItem) -> tuple[str, bool]:
-    # Ensure data is loaded for all representations
-    for rep in item.types:
-        if not rep.cached and rep.path:
-            try:
-                rep.data = Path(rep.path).read_bytes()
-                #rep.cached = True
-            except Exception as e:
-                print(f"Error loading {rep.path}: {e}")
-                continue
-
+def generate(item: CBItem, use_cached=True) -> tuple[str, bool]:
+    
     # Preferred image types in order
     preferred_images = ['image/jpeg', 'image/jpg', "audio/x-riff", 'image/png', 'image/tiff', 'image/bmp']
     
@@ -23,12 +14,20 @@ def generate(item: CBItem) -> tuple[str, bool]:
     image_rep = None
     for mime in preferred_images:
         for rep in item.types:
-            if rep.mime_type == mime and rep.data:
+            if rep.mime_type == mime:# and rep.data:
                 image_rep = rep
                 break
         if image_rep:
             break
-    
+    #
+    if image_rep and use_cached:
+        dir_path = Path(config.CACHE_DIRECTORY) / f"blobs/{item.hash}"
+        preview_path = dir_path / 'preview.jpg'
+        if preview_path.exists(): return preview_path, True
+
+    # Ensure data is loaded for all representations
+    diskload.load(item)
+
     if image_rep:
         # Process the image
         try:
