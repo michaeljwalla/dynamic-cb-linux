@@ -38,14 +38,21 @@ def get_timestamp() -> int:
     return prop.value[0] if prop else 0
 timestamp = get_timestamp() - 1 #initialize timestamp at startup
 
-def get_targets() -> list[str]:
+def get_targets(timeout=config.WATCH_TIMEOUT) -> list[str]:
     window.convert_selection(CLIPBOARD, TARGETS, TARGETS, X.CurrentTime)
     d.flush()
-
-    while True:
-        event = d.next_event()
-        if event.type == X.SelectionNotify:
-            break
+    
+    deadline = tick() + timeout
+    while tick() < deadline:
+        if d.pending_events():
+            event = d.next_event()
+            if event.type == X.SelectionNotify:
+                break
+        else:
+            sleep(config.WATCH_POLL_RETRY_INTERVAL)
+            pass
+    else:
+        return []  # owner never responded within timeout
 
     if event.property == X.NONE:
         return []
@@ -102,7 +109,6 @@ def _fetch_incr(target_atom, timeout=config.WATCH_TIMEOUT) -> bytes:
     else:
         return b""
     return b"".join(chunks)
-
 
 def fetch_data(target_name, timeout=config.WATCH_TIMEOUT) -> Representation | None:
     if config.DEBUG: print("START", target_name)
