@@ -335,8 +335,11 @@ class TkSavePopup(tk.Toplevel):
         self.withdraw()
         path = _native_save_dialog("untitled", rep.mime_type)
         if path:
-            with open(path, "wb") as f:
-                f.write(rep.data)
+            try:
+                with open(path, "wb") as f:
+                    f.write(rep.data)
+            except PermissionError:
+                TkPopup("You can't save files here...")
         self.destroy()
 
 
