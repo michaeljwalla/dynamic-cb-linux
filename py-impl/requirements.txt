@@ -1,3 +1,4 @@
 Pillow==12.1.1
 python_xlib==0.33
 Xlib==0.21
+# objgraph ver doesnt matter
