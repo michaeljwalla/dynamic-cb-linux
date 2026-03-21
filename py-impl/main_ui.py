@@ -4,7 +4,7 @@ import os
 import re
 import subprocess
 import tkinter as tk
-from tkinter import filedialog
+from tkinter import TclError, filedialog
 from PIL import Image, ImageTk
 import src.preview as preview
 from src.classes.clipboard import Clipboard
@@ -17,7 +17,8 @@ import src.x11api as api
 from src import config
 from src import ui_themes
 from pathlib import Path
-import time
+#import time
+#import objgraph
 
 ASSETS_DIR = os.path.join(os.path.dirname(__file__), "ui")
 
@@ -33,6 +34,15 @@ BUTTON_PAD_TOP = 3    # gap from top edge of frame (halved)
 clipboard = Clipboard()
 item_dict:dict[str, "UI_ClipboardItem"] = {}  # hash -> UI_ClipboardItem
 ui_clipboard = None  # Will be set in demo
+
+def catch(__exception:BaseException, func,*args, **kwargs):
+    assert issubclass(__exception, BaseException), "Expected a BaseException type"
+    try:
+        return [func(*args, **kwargs)], None
+    except __exception as e:
+        return [], e
+    #
+#
 
 errpopup:"TkPopup" = None
 def alerting(cbitem, state, popped):
@@ -641,7 +651,7 @@ class UI_ClipboardItem(tk.Frame):
 
     def update_with_cbitem(self, cbitem):
         self.cbitem = cbitem
-        result, is_path = preview.generate(cbitem)
+        result, is_path = preview.generate(cbitem, use_cached=True)
         self.set_preview(result, is_path=is_path)
 
     def set_preview(self, text: str = "", text_truncate: int = 40, is_path: bool = False):
@@ -655,7 +665,7 @@ class UI_ClipboardItem(tk.Frame):
         if not self.winfo_exists():  # or whatever your container widget is
             return
         if self._preview:
-            self._preview.destroy()
+            catch(TclError, self._preview.destroy)
             self._preview = None
 
         PAD_L     = 8
@@ -933,7 +943,7 @@ for i in sorted(items, key=lambda x: x.timestamp):
     ui_clipboard.add(i, ui_item)
     ui_item._on_pin_click()
 #
-offloader.cleanup_remnants(clipboard, clear_unpinned=False)
+offloader.cleanup_remnants(clipboard, clear_unpinned=True)
 
 # Start watcher with alerting
 def start_threads():
@@ -955,6 +965,15 @@ def start_threads():
 
 # schedule after event loop starts
 root.after(3000, start_threads)
-
+#debugging memory leak
+def memloop():
+    items = []
+    for i in clipboard.data[0]:
+        items.append(i.data)
+    for i in clipboard.data[1]:
+        items.append(i.data)
+    objgraph.show_refs(items, filename='sample-graph.png')
+    root.after(10000, memloop)
+#root.after(5000, memloop)
 root.mainloop()
 
