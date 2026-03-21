@@ -281,8 +281,11 @@ class TkSavePopup(tk.Toplevel):
         canvas.create_window((0, 0), window=inner, anchor="nw")
 
         for rep in cbitem.types:
-            if rep.mime_type in config.LEGACY_TEXT_TYPES: continue
             mime = rep.mime_type
+            if mime in config.LEGACY_TEXT_TYPES:
+                continue
+            if mime in config.MIME_ALIASES and mime != config.MIME_ALIASES[mime][-1]:
+                continue #no point having x-bmp bmp x-MS-bmp if they are all aliases
             ext  = mime.split("/")[-1]
             tk.Button(
                 inner,
