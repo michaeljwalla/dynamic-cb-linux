@@ -3,7 +3,7 @@ from pathlib import Path
 DEBUG = False
 
 
-MEM_THRESHOLD_MB = 150
+MEM_THRESHOLD_MB = 50
 MEM_DUMP_THRESHOLD_MB = MEM_THRESHOLD_MB * 1/3
 MAX_ITEMS = 50
 MEM_OFFLOAD_THRESHOLD_MB = MEM_DUMP_THRESHOLD_MB / MAX_ITEMS / 2 #once offload is triggered, things over this size go away

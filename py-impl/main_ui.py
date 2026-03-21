@@ -943,7 +943,7 @@ def start_threads():
 
     if not (offloader.rwpath / "tutorial").exists():
         TkPopup("You can change these settings in src/config.py", "Got it")
-        TkPopup("Memory is automatically freed (saved to disk), with a default of 150 MB space before offloading.", "Thanks")
+        TkPopup("Memory is automatically freed (saved to disk), with a default of 50 MB space before offloading.", "Thanks")
         TkPopup("Pin items to save them on-reboot!", "Alright")
         TkPopup("This tutorial only shows once...", "Continue")
         (offloader.rwpath / "tutorial").touch(exist_ok=True)
