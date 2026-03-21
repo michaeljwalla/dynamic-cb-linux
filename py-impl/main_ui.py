@@ -16,6 +16,7 @@ import src.processes.ipc as ipc
 import src.x11api as api
 from src import config
 from src import ui_themes
+from pathlib import Path
 import time
 
 ASSETS_DIR = os.path.join(os.path.dirname(__file__), "ui")
@@ -119,15 +120,20 @@ def _popup_monitor(win) -> tuple[int, int, int, int]:
         pass
     return 0, 0, win.winfo_screenwidth(), win.winfo_screenheight()
 
-
+savepath = os.path.expanduser(config.DEFAULT_SAVE_PATH)
+savepath = Path(savepath)
+savepath.mkdir(parents=True, exist_ok=True)
 def _native_save_dialog(default_name: str, mime_type: str) -> str | None:
     """
     Try zenity (GTK/GNOME) then kdialog (KDE) for a native save dialog.
     Falls back to tkinter filedialog if neither is available.
     Returns the chosen path string, or None if cancelled.
     """
-    ext = mime_type.split("/")[-1]
-    filename = f"{default_name}.{ext}"
+    if mime_type in config.SAVE_TYPE_OVERRIDES:
+        ext = config.SAVE_TYPE_OVERRIDES[mime_type]
+    else:
+        ext = mime_type.split("/")[-1]
+    filename = str(savepath / f"{default_name}.{ext}")
     # zenity (GNOME / GTK)
     try:
         result = subprocess.run(

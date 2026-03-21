@@ -38,38 +38,12 @@ for i in _aliases: MIME_ALIASES |= _aliases[i]
 #we dont need this tard type it bugs out half the time
 MIME_IGNORE = {}\
     | _aliases["icon"] # icons are usually small and not worth hashing, and often have weird formats that cause issues
-# MIME_TYPES = {
-#     "WILL_HASH": set([
-#         'text/plain',
-#         'text/plain;charset=utf-8',
-#         'text/html',
-#         'text/rtf',
-#         'UTF8_STRING',  # common legacy
 
-#         # image
-#         'image/png',
-#         'image/jpeg',
-#         'image/webp',
-#         'image/tiff',
-#         'image/bmp',
-
-#         # files
-#         'text/uri-list',
-
-#         # office - microsoft
-#         'application/vnd.ms-excel',
-#         'application/vnd.ms-word',
-#         'application/vnd.ms-powerpoint',
-
-#         # office - open document
-#         'application/vnd.oasis.opendocument.text',
-#         'application/vnd.oasis.opendocument.spreadsheet',
-#         'application/vnd.oasis.opendocument.presentation',
-#     ]),
-#     "WILL_HASH": { # What it will try to fetch. * means fetch all, anything before will stop early
-        
-#     }
-# }
+SAVE_TYPE_OVERRIDES = {} | dict(zip(
+    [i for i in LEGACY_TEXT_TYPES | {"text/plain"}],
+    ["txt" for i in range(len(LEGACY_TEXT_TYPES)+1)]
+))
+DEFAULT_SAVE_PATH = "~/Downloads"
 
 OFFLOAD_POLL_INTERVAL = 1.0
 OFFLOAD_FETCH_INTERVAL = 0.1
