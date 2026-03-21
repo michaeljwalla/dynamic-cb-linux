@@ -38,7 +38,7 @@ def stop():
 def sanitize(mime_type: str) -> str:
 
     sanitized = mime_type.strip()
-    sanitized = sanitized.replace("/", "_")
+    sanitized = sanitized.replace("/", "+")
     sanitized = re.sub(r"[;=]", "_", sanitized)
     sanitized = re.sub(r"\s+", "_", sanitized)
     sanitized = re.sub(r"[^\w.\-]", "", sanitized)
