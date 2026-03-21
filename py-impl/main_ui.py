@@ -278,19 +278,28 @@ class TkSavePopup(tk.Toplevel):
             "<Configure>",
             lambda _e: canvas.configure(scrollregion=canvas.bbox("all")),
         )
-        canvas.create_window((0, 0), window=inner, anchor="nw")
-
+        def _on_configure(e):
+            canvas.itemconfig(win_id, width=e.width)
+            # hide scrollbar if content fits
+            if inner.winfo_reqheight() <= e.height:
+                scrollbar.pack_forget()
+            else:
+                scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        #
+        win_id = canvas.create_window((0, 0), window=inner, anchor="nw")
+        canvas.bind("<Configure>", _on_configure)
         for rep in cbitem.types:
             mime = rep.mime_type
+            mime_l = mime.lower()
             if mime in config.LEGACY_TEXT_TYPES:
                 continue
-            if mime in config.MIME_ALIASES and mime != config.MIME_ALIASES[mime][-1]:
-                continue #no point having x-bmp bmp x-MS-bmp if they are all aliases
+            if mime_l in config.MIME_ALIASES and mime_l != config.MIME_ALIASES[mime_l][-1]:
+                continue #no point having x-bmp bmp x-MS-bmp if they are all
             ext  = mime.split("/")[-1]
             tk.Button(
                 inner,
                 text=mime,
-                anchor="w",
+                anchor="center",
                 bg=COLOR_ITEM,
                 fg=COLOR_TEXT,
                 activebackground=COLOR_HOVER,
