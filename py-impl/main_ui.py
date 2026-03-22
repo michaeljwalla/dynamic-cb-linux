@@ -966,14 +966,14 @@ def start_threads():
 # schedule after event loop starts
 root.after(3000, start_threads)
 #debugging memory leak
-def memloop():
-    items = []
-    for i in clipboard.data[0]:
-        items.append(i.data)
-    for i in clipboard.data[1]:
-        items.append(i.data)
-    objgraph.show_refs(items, filename='sample-graph.png')
-    root.after(10000, memloop)
+# def memloop():
+#     items = []
+#     for i in clipboard.data[0]:
+#         items.append(i.data)
+#     for i in clipboard.data[1]:
+#         items.append(i.data)
+#     objgraph.show_refs(items, filename='sample-graph.png')
+#     root.after(10000, memloop)
 #root.after(5000, memloop)
 root.mainloop()
 
