@@ -1,10 +1,20 @@
 from .classes.models import Representation
 from . import config
-
-from Xlib import X, display
+from sys import stderr
+from Xlib import X, display, error as xerr
 from time import perf_counter as tick, sleep
 
 d = display.Display()
+def _next_event():
+    return d.next_event()
+def _fail_event():
+    print("Failover Xlib event, exiting thread...", file=stderr)
+    exit()
+def _d_failover():
+    global _next_event
+    _next_event = _fail_event
+    return
+
 screen = d.screen()
 root = screen.root
 window = root.create_window(-1,-1,1,1,0, screen.root_depth)
@@ -17,10 +27,19 @@ timestamp = -1
 
 #just check if 
 def check() -> bool: #bool
-    global timestamp
-    last = timestamp
-    timestamp = get_timestamp()
-    return last != timestamp
+    try:
+        global timestamp
+        last = timestamp
+        timestamp = get_timestamp()
+        return last != timestamp, None
+    except xerr.ConnectionClosedError:
+        print("Xlib connection closed, exiting thread... (probably a shutdown)", file=stderr)
+        _d_failover()
+        exit() #quit the thread as api wouldnt even work anymore
+    # except xerr.DisplayConnectionError:
+    #     print("Display Connection Error, exiting thread...", file=stderr)
+    #     exit()
+
 
 def get_timestamp() -> int:
     window.convert_selection(CLIPBOARD, TIMESTAMP, TIMESTAMP, X.CurrentTime)
@@ -45,7 +64,7 @@ def get_targets(timeout=config.WATCH_TIMEOUT) -> list[str]:
     deadline = tick() + timeout
     while tick() < deadline:
         if d.pending_events():
-            event = d.next_event()
+            event = _next_event()
             if event.type == X.SelectionNotify:
                 break
         else:
@@ -73,7 +92,7 @@ INCR_ATOM = d.intern_atom("INCR")
 
 def _drain_events():
     while d.pending_events():
-        d.next_event()
+        _next_event()
 
 
 def _fetch_incr(target_atom, timeout=config.WATCH_TIMEOUT) -> bytes:
@@ -88,7 +107,7 @@ def _fetch_incr(target_atom, timeout=config.WATCH_TIMEOUT) -> bytes:
             sleep(config.WATCH_POLL_RETRY_INTERVAL)
             continue
 
-        event = d.next_event()
+        event = _next_event()
         if event.type != X.PropertyNotify:
             continue
         if event.atom != target_atom:
@@ -125,7 +144,7 @@ def fetch_data(target_name, timeout=config.WATCH_TIMEOUT) -> Representation | No
         deadline = tick() + timeout
         while tick() < deadline:
             if d.pending_events():
-                event = d.next_event()
+                event = _next_event()
                 if event.type == X.SelectionNotify:
                     break
             else:
