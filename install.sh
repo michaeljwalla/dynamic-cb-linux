@@ -30,7 +30,7 @@ APP_DIR="/usr/local/lib/dynamic-clipboard"
 BIN_DIR="/usr/local/bin"
 SRC_DIR="$(cd "$(dirname "$0")/py-impl" && pwd)"
 
-if [[ -d "$APP_DIR" || -d "$BIN_DIR/dynamic-clipboard*" ]]; then
+if [[ -d "$APP_DIR" ]] || compgen -G "$BIN_DIR/dynamic-clipboard*" > /dev/null; then
     echo "Error: installation paths already exist. (run uninstall.sh first!)" >&2
     exit 1
 fi
@@ -47,23 +47,23 @@ sudo $APP_DIR/.venv/bin/pip install --upgrade pip
 sudo $APP_DIR/.venv/bin/pip install -r $SRC_DIR/requirements.txt
 
 echo
-echo "Installing launcher to $BIN_DIR/dynamic-clipboard(-toggle)..."
+echo "Installing launcher to $BIN_DIR/dynamic-clipboard*..."
 
 #hardcoded path
-sudo tee $BIN_DIR/dynamic-clipboard > /dev/null << 'EOF'
+sudo tee $BIN_DIR/dynamic-clipboard-restart > /dev/null << 'EOF'
 #!/bin/bash
 exec /usr/local/lib/dynamic-clipboard/.venv/bin/python3 \
      /usr/local/lib/dynamic-clipboard/main_ui.py "$@"
 EOF
-sudo chmod +x $BIN_DIR/dynamic-clipboard 
+sudo chmod +x $BIN_DIR/dynamic-clipboard-restart
 
 #hardcoded path 
-sudo tee /usr/local/bin/dynamic-clipboard-toggle > /dev/null << 'EOF'
+sudo tee /usr/local/bin/dynamic-clipboard > /dev/null << 'EOF'
 #!/bin/bash
-echo "you should set /usr/local/bin/dynamic-clipboard-toggle to a hotkey!"
+echo "you should set 'dynamic-clipboard' to a hotkey!"
 echo "show" | /usr/bin/socat - UNIX-CONNECT:/tmp/dynamic-cb.sock
 EOF
-sudo chmod +x /usr/local/bin/dynamic-clipboard-toggle
+sudo chmod +x /usr/local/bin/dynamic-clipboard
 
 
 echo "Installing systemd service to "
@@ -76,7 +76,7 @@ Wants=graphical-session.target
 
 [Service]
 Type=simple
-ExecStart=/usr/local/bin/dynamic-clipboard
+ExecStart=/usr/local/bin/dynamic-clipboard-restart
 WorkingDirectory=/usr/local/bin
 Restart=on-failure
 RestartSec=3
@@ -100,8 +100,9 @@ systemctl --user restart dynamic-clipboard.service
 echo -e "\ndone.\n\n"
 echo ========================================================
 echo -e "set your shortcuts app to some key (Ctrl+Alt+V ?) to\n\
-run 'dynamic-clipboard-toggle'!"
+run 'dynamic-clipboard'!"
 echo -e "\nor, you can toggle directly from terminal\n\
-'dynamic-clipboard-toggle'"
+'dynamic-clipboard'"
 echo ========================================================
+echo "A tutorial should open soon..."
 #echo "reboot your system to start using Dynamic Clipboard!"

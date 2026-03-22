@@ -959,7 +959,7 @@ def start_threads():
         (offloader.rwpath / "tutorial").touch(exist_ok=True)
 
     TkPopup(
-        "Dynamic Clipboard has started successfully. Activate with 'dynamic-clipboard-toggle' or assign to a keybind!",
+        "Dynamic Clipboard has started successfully. Activate with 'dynamic-clipboard' or assign to a keybind!",
         "Cool"
     )
 
