@@ -31,7 +31,7 @@ def check() -> bool: #bool
         global timestamp
         last = timestamp
         timestamp = get_timestamp()
-        return last != timestamp, None
+        return last != timestamp
     except xerr.ConnectionClosedError:
         print("Xlib connection closed, exiting thread... (probably a shutdown)", file=stderr)
         _d_failover()
