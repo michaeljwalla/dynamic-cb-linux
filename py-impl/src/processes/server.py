@@ -1,3 +1,4 @@
+import select
 import threading
 from Xlib import X, display as xdisplay
 from Xlib.protocol import event as xevent
@@ -75,15 +76,20 @@ def _serve_loop(item: CBItem, stop: threading.Event):
     w.change_property(CLIPBOARD, STRING, 8, b'')
     d.flush()
 
+
     real_time = None
     while not stop.is_set():
-        if not d.pending_events():
-            stop.wait(config.SERVE_POLL_INTERVAL)
+        readable, _, _ = select.select([d.fileno()], [], [], config.SERVE_CHECK_INTERVAL)
+        if stop.is_set():
+            break
+        if not readable:
             continue
-
-        e = d.next_event()
-        if e.type == X.PropertyNotify and e.window == w:
-            real_time = e.time
+        while d.pending_events():
+            e = d.next_event()
+            if e.type == X.PropertyNotify and e.window == w:
+                real_time = e.time
+                break
+        if real_time is not None:
             break
 
     if real_time is None:
@@ -101,15 +107,19 @@ def _serve_loop(item: CBItem, stop: threading.Event):
         return
 
     try:
-        while not stop.is_set():
-            if not d.pending_events():
-                stop.wait(config.SERVE_POLL_INTERVAL)
-                continue
-
-            event = d.next_event()
-
-            if event.type == X.SelectionClear:
+        done = False
+        while not stop.is_set() and not done:
+            readable, _, _ = select.select([d.fileno()], [], [], config.SERVE_CHECK_INTERVAL)
+            if stop.is_set():
                 break
+            if not readable:
+                continue
+            while d.pending_events():
+                event = d.next_event()
+
+                if event.type == X.SelectionClear:
+                    done = True
+                    break
 
             if event.type == X.PropertyNotify:
                 key = (event.window.id, event.atom)
