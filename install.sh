@@ -30,6 +30,11 @@ APP_DIR="/usr/local/lib/dynamic-clipboard"
 BIN_DIR="/usr/local/bin"
 SRC_DIR="$(cd "$(dirname "$0")/py-impl" && pwd)"
 
+if [[ -d "$APP_DIR" || -d "$BIN_DIR/dynamic-clipboard*" ]]; then
+    echo "Error: installation paths already exist. (run uninstall.sh first!)" >&2
+    exit 1
+fi
+
 echo "Installing to $APP_DIR..."
 
 sudo mkdir -p $APP_DIR
@@ -90,7 +95,7 @@ sudo chown -R $USER:$USER /usr/local/lib/dynamic-clipboard
 systemctl --user daemon-reload
 systemctl --user enable dynamic-clipboard.service
 
-# systemctl --user restart dynamic-clipboard.service
+systemctl --user restart dynamic-clipboard.service
 
 echo -e "\ndone.\n\n"
 echo ========================================================
@@ -99,4 +104,4 @@ run 'dynamic-clipboard-toggle'!"
 echo -e "\nor, you can toggle directly from terminal\n\
 'dynamic-clipboard-toggle'"
 echo ========================================================
-echo "reboot your system to start using Dynamic Clipboard!"
+#echo "reboot your system to start using Dynamic Clipboard!"

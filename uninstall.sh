@@ -19,5 +19,5 @@ sudo rm -f ~/.config/systemd/user/$SERVICE.service
 sudo rm -f /tmp/dynamic-cb.sock
 echo ========================================================
 echo "Uninstalled dynamic clipboard, thanks for using!"
-echo "Reboot your device to apply."
+echo "You may need to reboot to fully apply."
 echo ========================================================
