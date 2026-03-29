@@ -16,7 +16,7 @@ def _format_bytes(n: int, places: int = 2, symbols=True):
 
 class Representation:
     __slots__ = ("mime_type", "data", "size", "cached", "path")
-    def __init__(self, mime_type, data: bytes, size: int, cached: bool, path: str): #bytes
+    def __init__(self, mime_type: str, data: bytes, size: int, cached: bool, path: str): #bytes
         self.mime_type = mime_type
         self.data = data
         self.size = size
