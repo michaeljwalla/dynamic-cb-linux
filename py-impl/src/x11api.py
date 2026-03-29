@@ -40,45 +40,36 @@ def check() -> bool: #bool
     #     print("Display Connection Error, exiting thread...", file=stderr)
     #     exit()
 
-
-def get_timestamp() -> int:
-    window.convert_selection(CLIPBOARD, TIMESTAMP, TIMESTAMP, X.CurrentTime)
-    d.flush()
-
-    while True:
-        event = d.next_event()
-        if event.type == X.SelectionNotify:
-            break
-
-    if event.property == X.NONE:
-        return 0
-
-    prop = window.get_full_property(TIMESTAMP, X.AnyPropertyType)
-    return prop.value[0] if prop else 0
-timestamp = get_timestamp() - 1 #initialize timestamp at startup
-
-def get_targets(timeout=config.WATCH_TIMEOUT) -> list[str]:
-    window.convert_selection(CLIPBOARD, TARGETS, TARGETS, X.CurrentTime)
-    d.flush()
-    
+def await_selection_notify(timeout=config.WATCH_TIMEOUT):
     deadline = tick() + timeout
     while tick() < deadline:
         if d.pending_events():
             event = _next_event()
             if event.type == X.SelectionNotify:
-                break
-        else:
-            sleep(config.WATCH_POLL_RETRY_INTERVAL)
-            pass
-    else:
-        return []  # owner never responded within timeout
+                return event
+        sleep(config.WATCH_POLL_RETRY_INTERVAL)
+    return None
 
-    if event.property == X.NONE:
-        return []
+def get_timestamp(timeout=config.WATCH_TIMEOUT) -> int:
+    window.convert_selection(CLIPBOARD, TIMESTAMP, TIMESTAMP, X.CurrentTime)
+    d.flush()
+
+    event = await_selection_notify(timeout)
+    if (not event) or (event.property == X.NONE): return 0
+
+    prop = window.get_full_property(TIMESTAMP, X.AnyPropertyType)
+    return prop.value[0] if prop else 0
+timestamp = get_timestamp() - 0.67 #initialize timestamp at startup, immediately ready for polling
+
+def get_targets(timeout=config.WATCH_TIMEOUT) -> list[str]:
+    window.convert_selection(CLIPBOARD, TARGETS, TARGETS, X.CurrentTime)
+    d.flush()
+    
+    event = await_selection_notify(timeout)
+    if (not event) or (event.property == X.NONE): return []
 
     prop = window.get_full_property(TARGETS, X.AnyPropertyType)
-    if not prop:
-        return []
+    if not prop: return []
 
     names = [d.get_atom_name(a) for a in prop.value]
     return [n for n in names if '/' in n or n in config.LEGACY_TEXT_TYPES]
@@ -89,9 +80,10 @@ d.flush()
 
 INCR_ATOM = d.intern_atom("INCR")
 
-
-def _drain_events():
-    while d.pending_events():
+#sigh i shouldnt have made d global
+def _drain_events(timeout=2*config.WATCH_TIMEOUT):
+    deadline = tick()+timeout
+    while tick()< deadline and d.pending_events():
         _next_event()
 
 
