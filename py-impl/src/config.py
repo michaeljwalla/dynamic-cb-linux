@@ -2,6 +2,8 @@ from pathlib import Path
 
 DEBUG = False
 
+#search for x11 display for this long before quitting
+STARTUP_RETRY_SECONDS = 15
 
 MEM_THRESHOLD_MB = 50
 MEM_DUMP_THRESHOLD_MB = MEM_THRESHOLD_MB * 1/3

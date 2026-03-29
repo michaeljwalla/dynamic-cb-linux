@@ -4,7 +4,18 @@ from sys import stderr
 from Xlib import X, display, error as xerr
 from time import perf_counter as tick, sleep
 
-d = display.Display()
+d = None
+deadline = tick() + config.STARTUP_RETRY_SECONDS
+while tick() < deadline:
+    try:
+        d = display.Display()
+        break
+    except:
+        sleep(0.25)
+#systemd will auto restart continually, just internal flag to know if this happened
+assert d, "Could not connect to Xorg display."
+
+
 def _next_event():
     return d.next_event()
 def _fail_event():
