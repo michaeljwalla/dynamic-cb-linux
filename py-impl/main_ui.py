@@ -843,6 +843,19 @@ class UI_ClipboardWidget(tk.Frame):
             item.update_with_cbitem(cbitem)
             # Update accent in case pin state changed
             item._update_accent()
+
+            if item in self.items:
+                self.items.remove(item)
+                if item._pinned:
+                    insert_idx = 0
+                else:
+                    insert_idx = len(self.items)
+                    for i, existing_item in enumerate(self.items):
+                        if not existing_item._pinned:
+                            insert_idx = i
+                            break
+                self.items.insert(insert_idx, item)
+
             # Check if this updated item should be selected
             # if cbitem and cbitem.hash == clipboard.selection.hash:
             #     self._set_selection(item)

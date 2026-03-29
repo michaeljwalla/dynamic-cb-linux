@@ -101,8 +101,9 @@ def _poll_loop(clipboard: Clipboard, stop: threading.Event, alerting=None):
                 print("TOTAL", f"{(total)*1e-6:.3f}")
                 print()
             # Mark item ready only if we own it (not a duplicate reuse)
-            if appended and snapshot is not None:
-                snapshot._ready.set()
-                # Alert finished state
-                if alerting:
-                    alerting(snapshot, state, None)
+            if snapshot is None: continue
+            snapshot._ready.set()
+            if not alerting: continue
+            
+            alerting(snapshot, state, None)
+            
