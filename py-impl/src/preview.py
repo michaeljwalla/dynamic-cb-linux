@@ -54,7 +54,7 @@ def generate(item: CBItem, use_cached=True) -> tuple[str, bool]:
     
     # No suitable image, try text/plain
     for rep in item.types:
-        if rep.mime_type == 'text/plain' and rep.data:
+        if rep.data and (rep.mime_type.find('text') != -1 or rep.mime_type.find("STRING") != -1):
             try:
                 text = rep.data.decode('utf-8', errors='ignore')
                 return text, False
