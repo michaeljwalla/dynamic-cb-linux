@@ -13,6 +13,7 @@ stop()             shuts it down.
 import socket
 import threading
 import os
+from sys import stderr
 
 SOCKET_PATH = "/tmp/dynamic-cb.sock"
 
@@ -105,6 +106,7 @@ def _serve(root, frame, stop: threading.Event):
                     _dispatch(root, frame, data)
                 except Exception as e:
                     print("IPC ERR", e)
+        print("IPC Connection closed.",file=stderr)
 
     try:
         os.unlink(SOCKET_PATH)

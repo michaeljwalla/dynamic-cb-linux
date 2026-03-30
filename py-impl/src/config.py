@@ -8,7 +8,7 @@ STARTUP_RETRY_SECONDS = 15
 MEM_THRESHOLD_MB = 50
 MEM_DUMP_THRESHOLD_MB = MEM_THRESHOLD_MB * 1/3
 MAX_ITEMS = 50
-MEM_OFFLOAD_THRESHOLD_MB = MEM_DUMP_THRESHOLD_MB / MAX_ITEMS / 2 #once offload is triggered, things over this size go away
+MEM_OFFLOAD_THRESHOLD_MB = MEM_DUMP_THRESHOLD_MB / MAX_ITEMS / 2 #once offload is triggered, things over this size are chosen to offload
 
 CACHE_DIRECTORY = str(Path.home() / ".cb_history")
 
