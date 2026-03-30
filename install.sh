@@ -36,11 +36,13 @@ if [[ -d "$APP_DIR" ]] || compgen -G "$BIN_DIR/dynamic-clipboard*" > /dev/null; 
 fi
 
 echo "Installing to $APP_DIR..."
-
 sudo mkdir -p $APP_DIR
 sudo cp -r $SRC_DIR/* $APP_DIR/
 
-echo "Creating environment..."
+echo -e "Copying uninstall.sh to $APP_DIR\n"
+sudo cp "./uninstall.sh" "$APP_DIR/"
+
+echo "Establishing python environment..."
 echo
 sudo python3 -m venv $APP_DIR/.venv
 sudo $APP_DIR/.venv/bin/pip install --upgrade pip
@@ -61,7 +63,7 @@ sudo chmod +x $BIN_DIR/dynamic-clipboard-restart
 sudo tee /usr/local/bin/dynamic-clipboard > /dev/null << 'EOF'
 #!/bin/bash
 echo "you should set 'dynamic-clipboard' to a hotkey!"
-echo "show" | /usr/bin/socat - UNIX-CONNECT:/tmp/dynamic-cb.sock
+echo "toggle" | /usr/bin/socat - UNIX-CONNECT:/tmp/dynamic-cb.sock
 EOF
 sudo chmod +x /usr/local/bin/dynamic-clipboard
 
@@ -95,8 +97,6 @@ sudo chown -R $USER:$USER /usr/local/lib/dynamic-clipboard
 systemctl --user daemon-reload
 systemctl --user enable dynamic-clipboard.service
 
-systemctl --user restart dynamic-clipboard.service
-
 echo -e "\ndone.\n\n"
 echo ========================================================
 echo -e "set your shortcuts app to some key (Ctrl+Alt+V ?) to\n\
@@ -104,5 +104,13 @@ run 'dynamic-clipboard'!"
 echo -e "\nor, you can toggle directly from terminal\n\
 'dynamic-clipboard'"
 echo ========================================================
-echo "A tutorial should open soon..."
-#echo "reboot your system to start using Dynamic Clipboard!"
+
+echo -e "\nThe program will start next time you reboot."
+read -p "Start immediately? [y/n] " -n 1 -r
+echo -e "\n"
+if [[ $REPLY =~ ^[Yy]$ ]]; then
+  echo "A tutorial should open soon..."
+  systemctl --user restart dynamic-clipboard.service
+else
+  echo "reboot your system to start using Dynamic Clipboard!"
+fi
