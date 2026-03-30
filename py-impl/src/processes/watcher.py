@@ -64,6 +64,9 @@ def _poll_loop(clipboard: Clipboard, stop: threading.Event, alerting=None):
                     if snapshot == clipwatch.BuilderState.FAIL_LOADPRIMARY:
                         print("FAILED to load CBItem of datatype", _[0])
                         break #do not add
+                    elif snapshot == clipwatch.BuilderState.FAIL_LOADREGULAR:
+                        continue
+
                     if not appended and snapshot.hash != "INVALID_STATE":
                         # Deduplicate: reuse existing item if hash is already known
                         if snapshot in clipboard:
@@ -101,7 +104,7 @@ def _poll_loop(clipboard: Clipboard, stop: threading.Event, alerting=None):
                 print("TOTAL", f"{(total)*1e-6:.3f}")
                 print()
             # Mark item ready only if we own it (not a duplicate reuse)
-            if snapshot is None: continue
+            if not isinstance(snapshot, CBItem): continue
             snapshot._ready.set()
             if not alerting: continue
             

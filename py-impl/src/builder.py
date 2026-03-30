@@ -37,7 +37,7 @@ def _build_snapshot_types(priority:list[str],targets:list[str]) -> Generator[tup
         if target.lower() in aliases: rep = Alias(target, aliases[target.lower()])
         else: rep = api.fetch_data(target)
         #
-        if rep is None:
+        if rep is None or not rep.data:
             yield (BuilderState.FAIL_LOADPRIMARY if i < count_p else BuilderState.FAIL_LOADREGULAR), target, ""
         else:
             t = rep.mime_type.lower()
