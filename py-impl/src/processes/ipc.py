@@ -14,6 +14,7 @@ import socket
 import threading
 import os
 from sys import stderr
+from ..wrapper import trackthread
 
 SOCKET_PATH = "/tmp/dynamic-cb.sock"
 
@@ -78,7 +79,7 @@ def _dispatch(root, frame, cmd: str):
     elif cmd == "toggle":
         root.after(0, lambda: _toggle(root, frame))
 
-
+@trackthread("SOCKET")
 def _serve(root, frame, stop: threading.Event):
     # Clean up stale socket
     try:
@@ -112,3 +113,4 @@ def _serve(root, frame, stop: threading.Event):
         os.unlink(SOCKET_PATH)
     except FileNotFoundError:
         pass
+

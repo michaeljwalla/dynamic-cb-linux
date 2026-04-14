@@ -17,6 +17,7 @@ import src.x11api as api
 from src import config
 from src import ui_themes
 from pathlib import Path
+from threading import get_native_id
 #import time
 #import objgraph
 
@@ -988,5 +989,6 @@ root.after(3000, start_threads)
 #     objgraph.show_refs(items, filename='sample-graph.png')
 #     root.after(10000, memloop)
 #root.after(5000, memloop)
+print(f"{"MAIN":<25} @ {get_native_id()}")
 root.mainloop()
 

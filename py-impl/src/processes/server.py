@@ -5,6 +5,7 @@ from Xlib.protocol import event as xevent
 from ..classes.models import CBItem, Representation
 from .. import config
 from .. import x11api as api
+from ..wrapper import trackthread
 
 _serve_thread: threading.Thread | None = None
 _serve_stop:   threading.Event  | None = None
@@ -28,6 +29,7 @@ def set(item: CBItem):
     _serve_thread.start()
 
 
+@trackthread("SERVER")
 def _serve_loop(item: CBItem, stop: threading.Event):
     d = xdisplay.Display()
     s = d.screen()
@@ -91,7 +93,7 @@ def _serve_loop(item: CBItem, stop: threading.Event):
                 break
         if real_time is not None:
             break
-
+    
     if real_time is None:
         w.destroy()
         d.close()

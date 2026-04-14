@@ -6,6 +6,7 @@ from tkinter import N
 from src import config
 from src.classes.models import CBItem, Representation, Alias
 from src.classes.clipboard import Clipboard
+from src.wrapper import trackthread
 
 import json
 
@@ -277,6 +278,7 @@ def cleanup_remnants(c: Clipboard, clear_unpinned=False):
         _clear_by_hash(dir.name)
     return
 
+@trackthread("OFFLOAD")
 def _poll_loop(clipboard: Clipboard, stop: threading.Event, offloading=None):
     while not stop.is_set():
         stop.wait(config.OFFLOAD_POLL_INTERVAL)

@@ -4,6 +4,7 @@ import src.builder as clipwatch
 from src import config
 from src.classes.models import CBItem
 from src.classes.clipboard import Clipboard
+from src.wrapper import trackthread
 
 _watcher_thread: threading.Thread | None = None
 _watcher_stop:   threading.Event  | None = None
@@ -21,6 +22,7 @@ def start(clipboard: Clipboard, alerting=None):
     stop = threading.Event()
     _watcher_stop = stop
     _watcher_thread = threading.Thread(target=_poll_loop, args=(clipboard, stop, alerting), daemon=True)
+
     _watcher_thread.start()
 
 
@@ -30,6 +32,7 @@ def stop():
         _watcher_stop.set()
 
 
+@trackthread("WATCHER")
 def _poll_loop(clipboard: Clipboard, stop: threading.Event, alerting=None):
     while not stop.is_set():
         stop.wait(config.WATCH_POLL_INTERVAL)

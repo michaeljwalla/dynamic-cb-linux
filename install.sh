@@ -80,6 +80,7 @@ Wants=graphical-session.target
 Type=simple
 ExecStart=/usr/local/bin/dynamic-clipboard-restart
 WorkingDirectory=/usr/local/bin
+Environment=PYTHONUNBUFFERED=1
 Restart=on-failure
 RestartSec=3
 
