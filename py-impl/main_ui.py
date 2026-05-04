@@ -713,6 +713,7 @@ class UI_ClipboardItem(tk.Frame):
 
 class UI_ClipboardWidget(tk.Frame):
     def __init__(self, root: tk.Tk, w: int = int(300), h: int = int(360)):
+        print(f"default {w=}, {h=}")
         super().__init__(root, bg=COLOR_BG, width=w, height=h)
         self.items: list[UI_ClipboardItem] = []
         self.selected_item: UI_ClipboardItem | None = None  # Track currently selected item
@@ -933,6 +934,7 @@ class UI_ClipboardWidget(tk.Frame):
 
 
 root = tk.Tk()
+root.title("Clipboard Manager")
 root.configure(bg=COLOR_BG,
                highlightbackground=COLOR_TEXT, highlightcolor=COLOR_TEXT, highlightthickness=1)
 root.wm_attributes("-type", "splash")
