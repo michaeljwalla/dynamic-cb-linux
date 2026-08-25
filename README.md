@@ -9,8 +9,8 @@ It features history, content pinning, disk caching, MIME conversion, file saving
 
 ## Installation
 - clone the repo
-- missing dependencies will be listed -- if not using APT, you may need to install them via your own package manager.
 - run `install.sh` in your shell to launch and establish the systemd process.
+  - missing dependencies will be listed -- if not using APT, you may need to install them via your own package manager.
 
 ## Recommendations
 - most desktop environments include processes to monitor and execute scripts based on keybinds. \
